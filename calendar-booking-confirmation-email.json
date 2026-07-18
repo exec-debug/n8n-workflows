@@ -1,0 +1,379 @@
+{
+  "name": "Calendar Booking Confirmation Email",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "SAMPLE_NODE_ID_001",
+      "name": "Poll Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "tm",
+              "name": "testMode",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "tr",
+              "name": "testRecordId",
+              "type": "string",
+              "value": "SAMPLE_RECORD_ID"
+            },
+            {
+              "id": "dm",
+              "name": "draftMode",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "de",
+              "name": "senderEmail",
+              "type": "string",
+              "value": "user@example.com"
+            },
+            {
+              "id": "le",
+              "name": "colleagueEmail",
+              "type": "string",
+              "value": "colleague@example.com"
+            },
+            {
+              "id": "lm",
+              "name": "batchLimit",
+              "type": "number",
+              "value": 10
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_002",
+      "name": "Confirmation Email Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        96
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_003",
+      "name": "Run W13 Manually (Test)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ $('Confirmation Email Config').item.json.testMode === true\n  ? \"SELECT Id, Lead_Email__c, Related_Lead__c, Meeting_Start_Date_Time__c, Meeting_End_Date_Time__c, Meeting_Timezone__c, Meeting_Source__c, Calendly_Confirmation_Sent__c FROM Meeting_Reminder_Tracker__c WHERE Id = '\" + $('Confirmation Email Config').item.json.testRecordId + \"' AND Meeting_Source__c = 'Calendly' LIMIT 1\"\n  : \"SELECT Id, Lead_Email__c, Related_Lead__c, Meeting_Start_Date_Time__c, Meeting_End_Date_Time__c, Meeting_Timezone__c, Meeting_Source__c, Calendly_Confirmation_Sent__c FROM Meeting_Reminder_Tracker__c WHERE Meeting_Source__c = 'Calendly' AND Meeting_Status__c = 'Scheduled' AND Calendly_Confirmation_Sent__c = false AND Related_Lead__c != null AND Lead_Email__c != null AND Meeting_Start_Date_Time__c != null LIMIT \" + $('Confirmation Email Config').item.json.batchLimit }}"
+      },
+      "id": "SAMPLE_NODE_ID_004",
+      "name": "Query Eligible Calendly Trackers",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "leadId": "={{ $json.Related_Lead__c }}"
+      },
+      "id": "SAMPLE_NODE_ID_005",
+      "name": "Fetch Lead Name",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Confirmation Email Config').item.json;\nconst trackerItems = $('Query Eligible Calendly Trackers').all();\nconst leadItems = $input.all();\n\nconst senderSig = '<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"font-family: Arial, sans-serif; font-size: 13px; color: #333333; line-height: 1.4;\"><tr><td style=\"padding-bottom: 8px;\"><img src=\"https://example.com/logo-placeholder.png\" alt=\"Example Company\" width=\"200\" style=\"display: block; border: 0;\" /></td></tr><tr><td><strong style=\"font-size: 14px;\">Example User</strong></td></tr><tr><td><em>Founder &amp; CEO</em></td></tr><tr><td style=\"padding-top: 6px;\"><a href=\"mailto:user@example.com\" style=\"color: #333333; text-decoration: none;\">user@example.com</a></td></tr><tr><td>O 555 010 0001</td></tr><tr><td>M 555 010 0002</td></tr><tr><td><a href=\"https://example.com/\" style=\"color: #0066CC; text-decoration: underline;\">example.com</a></td></tr><tr><td style=\"padding-top: 8px;\"><a href=\"https://calendly.com/example-user/30-min\" style=\"color: #0066CC; font-weight: bold; text-decoration: none;\">Book a meeting here</a></td></tr></table>';\n\nconst results = [];\n\nfor (let i = 0; i < trackerItems.length; i++) {\n  const tracker = trackerItems[i].json;\n  const lead = leadItems[i] ? leadItems[i].json : {};\n\n  if (tracker.Meeting_Source__c !== 'Calendly') continue;\n\n  const tz = tracker.Meeting_Timezone__c || 'America/Los_Angeles';\n  const startISO = tracker.Meeting_Start_Date_Time__c || '';\n  let readableDateTime = startISO;\n  try {\n    const dt = new Date(startISO);\n    readableDateTime = dt.toLocaleString('en-US', {\n      timeZone: tz,\n      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',\n      hour: 'numeric', minute: '2-digit', timeZoneName: 'short'\n    });\n  } catch(e) {}\n\n  const firstName = String(lead.FirstName || lead.Name || 'there');\n  const leadEmail = String(tracker.Lead_Email__c || lead.Email || '');\n\n  const subject = 'Your meeting with Example Company is confirmed';\n\n  const bodyHtml =\n    '<p>Hi ' + firstName + ',</p>'\n    + '<p>Thank you for scheduling a meeting with Example Company. This confirms that your meeting has been booked.</p>'\n    + '<p><strong>Meeting Details:</strong><br>'\n    + 'Date/Time: ' + readableDateTime + '</p>'\n    + '<p>We look forward to speaking with you.</p>'\n    + '<br>' + senderSig;\n\n  results.push({ json: {\n    trackerId: String(tracker.Id || ''),\n    leadId: String(tracker.Related_Lead__c || ''),\n    leadEmail,\n    firstName,\n    toAddress: leadEmail,\n    ccList: String(cfg.colleagueEmail || 'colleague@example.com'),\n    subject,\n    bodyHtml,\n    readableDateTime,\n    meetingTimezone: tz,\n    senderEmail: String(cfg.senderEmail || ''),\n    colleagueEmail: String(cfg.colleagueEmail || '')\n  }});\n}\n\nreturn results.length > 0 ? results : [{ json: { noEligibleTrackers: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_006",
+      "name": "Format Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "chk",
+              "leftValue": "={{ $json.trackerId }}",
+              "operator": {
+                "operation": "notEmpty",
+                "type": "string"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_007",
+      "name": "Eligible Trackers Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1120,
+        96
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_008",
+      "name": "No Eligible Trackers — Stop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## W13: Calendly Confirmation Email Sender\n\n✅ [STATUS REDACTED — configure after import]\n\nFLOW (no draft path):\nPoll Every 30 Minutes → Confirmation Email Config\n→ Query Eligible Calendly Trackers\n→ Fetch Lead Name → Format Email Data\n→ Eligible Trackers Found?\n→ Send Live Email\n→ Update Tracker — Confirmation Sent\n\nSender: Example User's Outlook\nTO: Lead_Email__c (real Lead email)\nCC: colleague@example.com only\nSignature: Example User (Founder & CEO)\n\nCONFIG NODE:\n- testMode: false = all eligible trackers\n- testRecordId: reference only\n- batchLimit: 10\n\nDuplicate guard: Calendly_Confirmation_Sent__c = false in query.\nMeeting_Source__c = Calendly guard in Format Email Data.\nNo draft mode — always sends live.",
+        "height": 440,
+        "width": 300,
+        "color": 7
+      },
+      "id": "SAMPLE_NODE_ID_009",
+      "name": "Sticky Note 8ebcd5f3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        656,
+        -384
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Query + Fetch\nIn testMode: queries only testRecordId\n  AND enforces Meeting_Source__c = 'Calendly'.\nIn live mode: queries all eligible Calendly trackers:\n  Meeting_Source__c = 'Calendly'\n  Meeting_Status__c = 'Scheduled'\n  Calendly_Confirmation_Sent__c = false\n  Related_Lead__c not null\n  Lead_Email__c not blank\n  Meeting_Start_Date_Time__c not null\nFetches Lead for FirstName.",
+        "height": 200,
+        "width": 300,
+        "color": 3
+      },
+      "id": "SAMPLE_NODE_ID_010",
+      "name": "Sticky Note 91c7d848",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        304,
+        -352
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Format + Send\nPolls every 30 minutes.\nFormat: date/time in Lead timezone.\nTO: Lead_Email__c\nCC: colleague@example.com only (Example User is sender, not CC'd)\nSignature: Example User — same Example Company logo as Example Representative's sig.\n\nAlways sends live (no draft mode).\nAfter send: Update tracker:\n  Calendly_Confirmation_Sent__c = true\n  Calendly_Confirmation_Sent_At__c = now\n  Last_Synced__c = now\n\nDuplicate send prevention:\n  Calendly_Confirmation_Sent__c = false filter in query.",
+        "height": 200,
+        "width": 300,
+        "color": 4
+      },
+      "id": "SAMPLE_NODE_ID_011",
+      "name": "Sticky Note 4ca75a88",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        -352
+      ]
+    },
+    {
+      "parameters": {
+        "toRecipients": "={{ $json.toAddress }}",
+        "subject": "={{ $json.subject }}",
+        "bodyContent": "={{ $json.bodyHtml }}",
+        "additionalFields": {
+          "ccRecipients": "={{ $json.ccList }}",
+          "bodyContentType": "html"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_012",
+      "name": "Send Live Email",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "update",
+        "customObject": "Meeting_Reminder_Tracker__c",
+        "recordId": "={{ $('Format Email Data').item.json.trackerId }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Calendly_Confirmation_Sent__c",
+              "value": "true"
+            },
+            {
+              "fieldId": "Calendly_Confirmation_Sent_At__c",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "fieldId": "Last_Synced__c",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "updateFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_013",
+      "name": "Update Tracker — Confirmation Sent",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        192
+      ]
+    }
+  ],
+  "connections": {
+    "Confirmation Email Config": {
+      "main": [
+        [
+          {
+            "node": "Query Eligible Calendly Trackers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run W13 Manually (Test)": {
+      "main": [
+        [
+          {
+            "node": "Confirmation Email Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Eligible Calendly Trackers": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Lead Name": {
+      "main": [
+        [
+          {
+            "node": "Format Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Email Data": {
+      "main": [
+        [
+          {
+            "node": "Eligible Trackers Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eligible Trackers Found?": {
+      "main": [
+        [
+          {
+            "node": "Send Live Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Eligible Trackers — Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Live Email": {
+      "main": [
+        [
+          {
+            "node": "Update Tracker — Confirmation Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Every 30 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Confirmation Email Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "nodeGroups": [],
+  "tags": []
+}

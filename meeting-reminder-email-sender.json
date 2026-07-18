@@ -1,0 +1,871 @@
+{
+  "name": "Meeting Reminder Email Sender",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "tm",
+              "name": "testMode",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "tr",
+              "name": "testRecordId",
+              "type": "string",
+              "value": "SAMPLE_RECORD_ID"
+            },
+            {
+              "id": "to",
+              "name": "testRecipientOverride",
+              "type": "string",
+              "value": "user@example.com"
+            },
+            {
+              "id": "dm",
+              "name": "draftMode",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "de",
+              "name": "senderEmail",
+              "type": "string",
+              "value": "user@example.com"
+            },
+            {
+              "id": "le",
+              "name": "colleagueEmail",
+              "type": "string",
+              "value": "colleague@example.com"
+            },
+            {
+              "id": "lm",
+              "name": "batchLimit",
+              "type": "number",
+              "value": 10
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_001",
+      "name": "Meeting Reminder Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        480
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_002",
+      "name": "Manual Admin Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ $('Meeting Reminder Config').item.json.testMode === true\n  ? \"SELECT Id, Lead_Email__c, Related_Lead__c, Meeting_Start_Date_Time__c, Meeting_Timezone__c, Reminder_24h_Scheduled_Time__c, X24_Hour_Reminder_Sent__c, Outlook_Event_ID__c, Meeting_Key__c FROM Meeting_Reminder_Tracker__c WHERE Id = '\" + $('Meeting Reminder Config').item.json.testRecordId + \"' AND Meeting_Status__c = 'Scheduled' AND X24_Hour_Reminder_Sent__c = false AND Lead_Email__c != null AND Related_Lead__c != null AND Meeting_Start_Date_Time__c != null AND Reminder_24h_Scheduled_Time__c != null LIMIT 1\"\n  : \"SELECT Id, Lead_Email__c, Related_Lead__c, Meeting_Start_Date_Time__c, Meeting_Timezone__c, Reminder_24h_Scheduled_Time__c, X24_Hour_Reminder_Sent__c, Outlook_Event_ID__c, Meeting_Key__c FROM Meeting_Reminder_Tracker__c WHERE Meeting_Status__c = 'Scheduled' AND X24_Hour_Reminder_Sent__c = false AND Reminder_24h_Scheduled_Time__c <= \" + $now.toISO() + \" AND Meeting_Start_Date_Time__c > \" + $now.plus({hours:1}).toISO() + \" AND Lead_Email__c != null AND Related_Lead__c != null AND Meeting_Start_Date_Time__c != null AND Reminder_24h_Scheduled_Time__c != null AND (Outlook_Event_ID__c != null OR Meeting_Key__c != null) LIMIT \" + $('Meeting Reminder Config').item.json.batchLimit }}"
+      },
+      "id": "SAMPLE_NODE_ID_003",
+      "name": "Query 24h Eligible Trackers",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "leadId": "={{ $json.Related_Lead__c }}"
+      },
+      "id": "SAMPLE_NODE_ID_004",
+      "name": "Fetch Lead Name (24h)",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Meeting Reminder Config').item.json;\nconst trackerItems = $('Query 24h Eligible Trackers').all();\nconst leadItems = $input.all();\nconst results = [];\nconst logoHtml = '<img src=\"https://example.com/logo-placeholder.png\" alt=\"Example Company\" width=\"200\" style=\"display:block;border:0;margin-bottom:8px;\" />';\nfor (let i = 0; i < trackerItems.length; i++) {\n  const tracker = trackerItems[i].json;\n  const lead = leadItems[i] ? leadItems[i].json : {};\n  const tz = tracker.Meeting_Timezone__c || 'America/Los_Angeles';\n  let readableDateTime = tracker.Meeting_Start_Date_Time__c || '';\n  try {\n    const dt = new Date(tracker.Meeting_Start_Date_Time__c);\n    readableDateTime = dt.toLocaleString('en-US', {\n      timeZone: tz, weekday: 'long', year: 'numeric', month: 'long',\n      day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short'\n    });\n  } catch(e) {}\n  const firstName = String(lead.FirstName || lead.Name || 'there');\n  const leadEmail = String(tracker.Lead_Email__c || lead.Email || '');\n  const toAddress = cfg.testMode === true ? String(cfg.testRecipientOverride || 'user@example.com') : leadEmail;\n  const ccList = cfg.senderEmail + ',' + cfg.colleagueEmail;\n  const subject = \"Tomorrow's Meeting with Example Company\";\n  const bodyHtml =\n    '<p>Hi ' + firstName + ',</p>'\n    + '<p>We\\u2019re looking forward to connect with you tomorrow and learn more about your company.</p>'\n    + '<p>Your meeting with Example Company is scheduled for:</p>'\n    + '<p><strong>' + readableDateTime + '</strong></p>'\n    + '<p>Example User, Founder &amp; CEO, and Example Representative, Business Development Representative, will be joining the call. The conversation will be a chance to better understand your current priorities, the types of properties or accounts you\\u2019re focused on, and where our team may be able to help.</p>'\n    + '<p>No preparation is needed ahead of the meeting. We simply look forward to getting to know your needs and seeing whether Example Company may be a good fit.</p>'\n    + '<p>Please don\\u2019t hesitate to reach out if anything comes up before tomorrow\\u2019s call.</p>'\n    + '<p>Best regards,</p>'\n    + '<p>' + logoHtml + '</p>'\n    + '<p>Example User<br>Founder &amp; CEO<br>user@example.com<br>O 555 010 0001 &nbsp; M 555 010 0002<br><a href=\"https://example.com\">example.com</a><br><a href=\"https://calendly.com/example-user\">Book a meeting here</a></p>'\n    + '<p>Example Representative<br>Business Development Representative<br>Example Company<br>555-010-0000</p>';\n  results.push({ json: {\n    trackerId: String(tracker.Id || ''),\n    leadId: String(tracker.Related_Lead__c || ''),\n    leadEmail, firstName, toAddress, ccList, subject, bodyHtml, readableDateTime,\n    reminderType: '24h', testMode: cfg.testMode === true, draftMode: cfg.draftMode === true,\n    senderEmail: String(cfg.senderEmail || ''), colleagueEmail: String(cfg.colleagueEmail || '')\n  }});\n}\nreturn results.length > 0 ? results : [{ json: { noEligible: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_005",
+      "name": "Format 24h Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "e",
+              "leftValue": "={{ $json.trackerId }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_006",
+      "name": "Eligible 24h?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1344,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "dm",
+              "leftValue": "={{ $json.draftMode }}",
+              "operator": {
+                "operation": "true",
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_007",
+      "name": "Draft Mode? (24h)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1568,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "={{ $json.subject }}",
+        "bodyContent": "={{ $json.bodyHtml }}",
+        "additionalFields": {
+          "ccRecipients": "={{ $json.ccList }}",
+          "bodyContentType": "html",
+          "toRecipients": "={{ $json.toAddress }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_008",
+      "name": "Create Draft (24h)",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "toRecipients": "={{ $json.toAddress }}",
+        "subject": "={{ $json.subject }}",
+        "bodyContent": "={{ $json.bodyHtml }}",
+        "additionalFields": {
+          "ccRecipients": "={{ $json.ccList }}",
+          "bodyContentType": "html"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_009",
+      "name": "Send Live Email (24h)",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "update",
+        "customObject": "Meeting_Reminder_Tracker__c",
+        "recordId": "={{ $('Format 24h Email').item.json.trackerId }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "X24_Hour_Reminder_Sent__c",
+              "value": "true"
+            },
+            {
+              "fieldId": "Last_Synced__c",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "updateFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_010",
+      "name": "Update Tracker — 24h Sent",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        2464,
+        288
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_011",
+      "name": "No 24h Reminders Due",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ $('Meeting Reminder Config').item.json.testMode === true\n  ? \"SELECT Id, Lead_Email__c, Related_Lead__c, Meeting_Start_Date_Time__c, Meeting_Timezone__c, Reminder_1h_Scheduled_Time__c, X1_Hour_Reminder_Sent__c, Outlook_Event_ID__c, Meeting_Key__c FROM Meeting_Reminder_Tracker__c WHERE Id = '\" + $('Meeting Reminder Config').item.json.testRecordId + \"' AND Meeting_Status__c = 'Scheduled' AND X1_Hour_Reminder_Sent__c = false AND Lead_Email__c != null AND Related_Lead__c != null AND Meeting_Start_Date_Time__c != null AND Reminder_1h_Scheduled_Time__c != null LIMIT 1\"\n  : \"SELECT Id, Lead_Email__c, Related_Lead__c, Meeting_Start_Date_Time__c, Meeting_Timezone__c, Reminder_1h_Scheduled_Time__c, X1_Hour_Reminder_Sent__c, Outlook_Event_ID__c, Meeting_Key__c FROM Meeting_Reminder_Tracker__c WHERE Meeting_Status__c = 'Scheduled' AND X1_Hour_Reminder_Sent__c = false AND Reminder_1h_Scheduled_Time__c <= \" + $now.toISO() + \" AND Meeting_Start_Date_Time__c > \" + $now.toISO() + \" AND Lead_Email__c != null AND Related_Lead__c != null AND Meeting_Start_Date_Time__c != null AND Reminder_1h_Scheduled_Time__c != null AND (Outlook_Event_ID__c != null OR Meeting_Key__c != null) LIMIT \" + $('Meeting Reminder Config').item.json.batchLimit }}"
+      },
+      "id": "SAMPLE_NODE_ID_012",
+      "name": "Query 1h Eligible Trackers",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "leadId": "={{ $json.Related_Lead__c }}"
+      },
+      "id": "SAMPLE_NODE_ID_013",
+      "name": "Fetch Lead Name (1h)",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Meeting Reminder Config').item.json;\nconst trackerItems = $('Query 1h Eligible Trackers').all();\nconst leadItems = $input.all();\nconst results = [];\nconst logoHtml = '<img src=\"https://example.com/logo-placeholder.png\" alt=\"Example Company\" width=\"200\" style=\"display:block;border:0;margin-bottom:8px;\" />';\nfor (let i = 0; i < trackerItems.length; i++) {\n  const tracker = trackerItems[i].json;\n  const lead = leadItems[i] ? leadItems[i].json : {};\n  const tz = tracker.Meeting_Timezone__c || 'America/Los_Angeles';\n  let readableDateTime = tracker.Meeting_Start_Date_Time__c || '';\n  try {\n    const dt = new Date(tracker.Meeting_Start_Date_Time__c);\n    readableDateTime = dt.toLocaleString('en-US', {\n      timeZone: tz, weekday: 'long', year: 'numeric', month: 'long',\n      day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short'\n    });\n  } catch(e) {}\n  const firstName = String(lead.FirstName || lead.Name || 'there');\n  const leadEmail = String(tracker.Lead_Email__c || lead.Email || '');\n  const toAddress = cfg.testMode === true ? String(cfg.testRecipientOverride || 'user@example.com') : leadEmail;\n  const ccList = cfg.senderEmail + ',' + cfg.colleagueEmail;\n  const subject = 'Reminder: Your meeting with Example Company is today';\n  const bodyHtml =\n    '<p>Hi ' + firstName + ',</p>'\n    + '<p>Thank you for scheduling time to meet with Example Company. We\\u2019re looking forward to connecting with you.</p>'\n    + '<p><strong>Meeting Details</strong></p>'\n    + '<p>' + readableDateTime + '</p>'\n    + '<p>Example User, Founder &amp; CEO, and Example Representative, Business Development Representative, look forward to learning more about your organization, portfolio, and current priorities.</p>'\n    + '<p>The meeting will be an informal conversation to better understand your goals, challenges, and where Example Company may be able to support your business.</p>'\n    + '<p>If you have any questions before the meeting, please feel free to reach out.</p>'\n    + '<p>Best regards,</p>'\n    + '<p>' + logoHtml + '</p>'\n    + '<p>Example User<br>Founder &amp; CEO<br>user@example.com<br>O 555 010 0001 &nbsp; M 555 010 0002<br><a href=\"https://example.com\">example.com</a><br><a href=\"https://calendly.com/example-user\">Book a meeting here</a></p>'\n    + '<p>Example Representative<br>Business Development Representative<br>Example Company<br>555-010-0000</p>';\n  results.push({ json: {\n    trackerId: String(tracker.Id || ''),\n    leadId: String(tracker.Related_Lead__c || ''),\n    leadEmail, firstName, toAddress, ccList, subject, bodyHtml, readableDateTime,\n    reminderType: '1h', testMode: cfg.testMode === true, draftMode: cfg.draftMode === true,\n    senderEmail: String(cfg.senderEmail || ''), colleagueEmail: String(cfg.colleagueEmail || '')\n  }});\n}\nreturn results.length > 0 ? results : [{ json: { noEligible: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_014",
+      "name": "Format 1h Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "e",
+              "leftValue": "={{ $json.trackerId }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_015",
+      "name": "Eligible 1h?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1120,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "dm",
+              "leftValue": "={{ $json.draftMode }}",
+              "operator": {
+                "operation": "true",
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_016",
+      "name": "Draft Mode? (1h)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1344,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "={{ $json.subject }}",
+        "bodyContent": "={{ $json.bodyHtml }}",
+        "additionalFields": {
+          "ccRecipients": "={{ $json.ccList }}",
+          "bodyContentType": "html",
+          "toRecipients": "={{ $json.toAddress }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_017",
+      "name": "Create Draft (1h)",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "toRecipients": "={{ $json.toAddress }}",
+        "subject": "={{ $json.subject }}",
+        "bodyContent": "={{ $json.bodyHtml }}",
+        "additionalFields": {
+          "ccRecipients": "={{ $json.ccList }}",
+          "bodyContentType": "html"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_018",
+      "name": "Send Live Email (1h)",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "update",
+        "customObject": "Meeting_Reminder_Tracker__c",
+        "recordId": "={{ $('Format 1h Email').item.json.trackerId }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "X1_Hour_Reminder_Sent__c",
+              "value": "true"
+            },
+            {
+              "fieldId": "Last_Synced__c",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "updateFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_019",
+      "name": "Update Tracker — 1h Sent",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        2240,
+        672
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_020",
+      "name": "No 1h Reminders Due",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## W12: Meeting Reminder Email Sender\n\n✅ [STATUS REDACTED — configure after import]\n\nCONFIG NODE (current live settings):\n- testMode: false — processes all due reminders\n- draftMode: false — sends live emails\n- testRecordId: SAMPLE_RECORD_ID (ignored when testMode=false)\n- testRecipientOverride: user@example.com (ignored when testMode=false)\n- batchLimit: 10\n\nTo test safely in future:\n  Set testMode=true + draftMode=true, republish.\n  Restore testMode=false + draftMode=false before going live again.\n\nSender: Example User's Outlook\nTO: Lead_Email__c (real Lead email in live mode)\nCC: user@ and colleague@ on every send\n\nBoth 24h and 1h branches run every poll independently.\nDuplicate guard: sent flag filters prevent resends.",
+        "height": 616,
+        "width": 300,
+        "color": 5
+      },
+      "id": "SAMPLE_NODE_ID_021",
+      "name": "Sticky Note 1e0c0fca",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Query Logic (live mode)\n\n24h branch — runs every poll:\n  Meeting_Status__c = Scheduled\n  X24_Hour_Reminder_Sent__c = false\n  Reminder_24h_Scheduled_Time__c <= now\n  Meeting_Start_Date_Time__c > now + 1h (safety guard)\n\n1h branch — runs every poll:\n  Meeting_Status__c = Scheduled\n  X1_Hour_Reminder_Sent__c = false\n  Reminder_1h_Scheduled_Time__c <= now\n  Meeting_Start_Date_Time__c > now (safety guard)\n\nTestMode=true: both queries use testRecordId only,\nregardless of reminder timing.",
+        "height": 360,
+        "width": 300,
+        "color": 3
+      },
+      "id": "SAMPLE_NODE_ID_022",
+      "name": "Sticky Note a35c32ef",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Send + Update (live mode)\n\nDraftMode=false (current):\n  Sends email via Example User Outlook\n  24h → X24_Hour_Reminder_Sent__c = true + Last_Synced__c = now\n  1h → X1_Hour_Reminder_Sent__c = true + Last_Synced__c = now\n\nDraftMode=true (future testing):\n  Creates draft in Example User Outlook Drafts only\n  No Salesforce fields updated\n\nDuplicate prevention:\n  SOQL filters on sent flags prevent any resend.\n  Once flag is true, tracker never appears in query again.",
+        "height": 392,
+        "width": 300,
+        "color": 4
+      },
+      "id": "SAMPLE_NODE_ID_023",
+      "name": "Sticky Note c86fdfda",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Guard: only allow 24h reminder to send if meeting is NOT today\n// and is still at least 20 hours away.\n// Receives items from Format 24h Email (one per tracker).\nconst now = Date.now();\nconst TWENTY_HOURS_MS = 20 * 60 * 60 * 1000;\nconst results = [];\n\nfor (const item of $input.all()) {\n  const ctx = item.json;\n  // Pass-through noEligible items (empty batch)\n  if (ctx.noEligible) {\n    results.push({ json: { ...ctx } });\n    continue;\n  }\n\n  // Get meeting start from tracker (stored in Format 24h Email output via trackerItems)\n  // Format 24h Email doesn't carry meetingStartISO directly, so we re-read from\n  // Query 24h Eligible Trackers by matching trackerId.\n  let meetingStartISO = null;\n  let meetingTz = 'America/Los_Angeles';\n  try {\n    const trackerItems = $('Query 24h Eligible Trackers').all();\n    for (const t of trackerItems) {\n      if (String(t.json.Id || '') === String(ctx.trackerId || '')) {\n        meetingStartISO = String(t.json.Meeting_Start_Date_Time__c || '');\n        meetingTz = String(t.json.Meeting_Timezone__c || 'America/Los_Angeles');\n        break;\n      }\n    }\n    // Fallback: positional match if Id not found (single-item batch)\n    if (!meetingStartISO && trackerItems.length > 0) {\n      meetingStartISO = String(trackerItems[0].json.Meeting_Start_Date_Time__c || '');\n      meetingTz = String(trackerItems[0].json.Meeting_Timezone__c || 'America/Los_Angeles');\n    }\n  } catch(e) {}\n\n  if (!meetingStartISO) {\n    // Can't validate — skip safely\n    results.push({ json: { noEligible: true, skipReason: '24h skipped: could not determine meeting start time' } });\n    continue;\n  }\n\n  const meetingStart = new Date(meetingStartISO).getTime();\n  const hoursUntilMeeting = (meetingStart - now) / (60 * 60 * 1000);\n\n  // Check: is the meeting today in the meeting timezone?\n  const todayInTz = new Date().toLocaleDateString('en-CA', { timeZone: meetingTz }); // YYYY-MM-DD\n  const meetingDateInTz = new Date(meetingStartISO).toLocaleDateString('en-CA', { timeZone: meetingTz });\n  const isMeetingToday = (todayInTz === meetingDateInTz);\n\n  if (isMeetingToday) {\n    results.push({ json: { noEligible: true, skipReason: '24h skipped: meeting is today (' + meetingDateInTz + ') in timezone ' + meetingTz } });\n    continue;\n  }\n\n  if (hoursUntilMeeting < 20) {\n    results.push({ json: { noEligible: true, skipReason: '24h skipped: meeting is only ' + hoursUntilMeeting.toFixed(1) + 'h away (< 20h threshold)' } });\n    continue;\n  }\n\n  if (meetingStart <= now) {\n    results.push({ json: { noEligible: true, skipReason: '24h skipped: meeting is in the past' } });\n    continue;\n  }\n\n  // All checks passed — allow send\n  results.push({ json: { ...ctx } });\n}\n\nreturn results.length > 0 ? results : [{ json: { noEligible: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_024",
+      "name": "Validate 24h Timing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "SAMPLE_NODE_ID_025",
+      "name": "Poll Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "limit": 5,
+        "output": "fields",
+        "fields": [
+          "attendees",
+          "iCalUId",
+          "isCancelled",
+          "start",
+          "end",
+          "subject",
+          "organizer"
+        ],
+        "filters": {
+          "custom": "={{ \"iCalUId eq '\" + $('Query 24h Eligible Trackers').item.json.Outlook_Event_ID__c + \"'\" }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_026",
+      "name": "Fetch Outlook Event (24h)",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// W12 RSVP / Event Guard — 24h branch\n// Updated 2026-07-07: RSVP check removed per current policy (W12A aligned).\n// Blocks send if: event missing, cancelled, lead not found in attendees, or time mismatch.\n// Does NOT block on RSVP status (none/tentative/declined are now allowed).\n// Item matching is key-based (iCalUID join), not positional — safe when Outlook drops items.\n\nconst INTERNAL_EMAILS = ['user@example.com', 'colleague@example.com'];\nconst TIME_TOLERANCE_SEC = 60;\n\nconst formatItems = $('Format 24h Email').all();\nconst trackerItems = $('Query 24h Eligible Trackers').all();\nconst outlookItems = $input.all();\n\nconst results = [];\n\nfor (let i = 0; i < formatItems.length; i++) {\n  const fmt = formatItems[i].json;\n\n  if (fmt.noEligible) {\n    results.push({ json: { ...fmt } });\n    continue;\n  }\n\n  const tracker = trackerItems.find(t => String(t.json.Id || '') === String(fmt.trackerId || ''));\n  if (!tracker) {\n    results.push({ json: { noEligible: true, skipReason: '24h guard: tracker not found for id ' + fmt.trackerId } });\n    continue;\n  }\n\n  const iCalUID = String(tracker.json.Outlook_Event_ID__c || '').trim();\n  const leadEmail = String(tracker.json.Lead_Email__c || fmt.leadEmail || '').trim().toLowerCase();\n  const sfStartISO = String(tracker.json.Meeting_Start_Date_Time__c || '');\n\n  if (!iCalUID) {\n    results.push({ json: { noEligible: true, skipReason: '24h guard: Outlook_Event_ID__c is empty — cannot verify event' } });\n    continue;\n  }\n\n  if (!leadEmail) {\n    results.push({ json: { noEligible: true, skipReason: '24h guard: Lead_Email__c is empty — cannot verify attendee' } });\n    continue;\n  }\n\n  const matchingEvents = outlookItems.filter(item =>\n    String(item.json.iCalUId || '').trim() === iCalUID\n  );\n\n  if (matchingEvents.length === 0) {\n    results.push({ json: { noEligible: true, skipReason: '24h guard: no Outlook event found for iCalUID — event may be deleted or missing. W12A will sync status.' } });\n    continue;\n  }\n\n  if (matchingEvents.length > 1) {\n    results.push({ json: { noEligible: true, skipReason: '24h guard: ' + matchingEvents.length + ' Outlook events matched iCalUID — ambiguous, blocking reminder.' } });\n    continue;\n  }\n\n  const liveEvent = matchingEvents[0].json;\n\n  if (liveEvent.isCancelled === true) {\n    results.push({ json: { noEligible: true, skipReason: '24h guard: Outlook event is cancelled (isCancelled=true). W12A will sync status.' } });\n    continue;\n  }\n\n  const attendees = Array.isArray(liveEvent.attendees) ? liveEvent.attendees : [];\n  const leadAttendee = attendees.find(a => {\n    const addr = String(a.emailAddress?.address || '').trim().toLowerCase();\n    return addr === leadEmail && !INTERNAL_EMAILS.includes(addr);\n  });\n\n  if (!leadAttendee) {\n    results.push({ json: { noEligible: true, skipReason: '24h guard: lead ' + leadEmail + ' not found in Outlook attendees (' + attendees.length + ' total). W12A will sync.' } });\n    continue;\n  }\n\n  // RSVP check removed — per current policy, non-accepted RSVPs are allowed.\n  // const rsvp = String(leadAttendee.status?.response || '').trim().toLowerCase();\n  // if (rsvp !== 'accepted') { ... }\n\n  if (sfStartISO && liveEvent.start?.dateTime) {\n    const sfMs = new Date(sfStartISO).getTime();\n    const outlookMs = new Date(liveEvent.start.dateTime).getTime();\n    const diffSec = Math.abs(sfMs - outlookMs) / 1000;\n    if (diffSec > TIME_TOLERANCE_SEC) {\n      results.push({ json: { noEligible: true, skipReason: '24h guard: Outlook start differs from Salesforce by ' + Math.round(diffSec) + 's — blocking. W12A will sync updated time first.' } });\n      continue;\n    }\n  }\n\n  results.push({ json: { ...fmt } });\n}\n\nreturn results.length > 0 ? results : [{ json: { noEligible: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_027",
+      "name": "RSVP / Event Guard (24h)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "limit": 5,
+        "output": "fields",
+        "fields": [
+          "attendees",
+          "iCalUId",
+          "isCancelled",
+          "start",
+          "end",
+          "subject",
+          "organizer"
+        ],
+        "filters": {
+          "custom": "={{ \"iCalUId eq '\" + $('Query 1h Eligible Trackers').item.json.Outlook_Event_ID__c + \"'\" }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_028",
+      "name": "Fetch Outlook Event (1h)",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// W12 RSVP / Event Guard — 1h branch\n// Updated 2026-07-07: RSVP check removed per current policy (W12A aligned).\n// Blocks send if: event missing, cancelled, lead not found in attendees, or time mismatch.\n// Does NOT block on RSVP status (none/tentative/declined are now allowed).\n// Item matching is key-based (iCalUID join), not positional — safe when Outlook drops items.\n\nconst INTERNAL_EMAILS = ['user@example.com', 'colleague@example.com'];\nconst TIME_TOLERANCE_SEC = 60;\n\nconst formatItems = $('Format 1h Email').all();\nconst trackerItems = $('Query 1h Eligible Trackers').all();\nconst outlookItems = $input.all();\n\nconst results = [];\n\nfor (let i = 0; i < formatItems.length; i++) {\n  const fmt = formatItems[i].json;\n\n  if (fmt.noEligible) {\n    results.push({ json: { ...fmt } });\n    continue;\n  }\n\n  const tracker = trackerItems.find(t => String(t.json.Id || '') === String(fmt.trackerId || ''));\n  if (!tracker) {\n    results.push({ json: { noEligible: true, skipReason: '1h guard: tracker not found for id ' + fmt.trackerId } });\n    continue;\n  }\n\n  const iCalUID = String(tracker.json.Outlook_Event_ID__c || '').trim();\n  const leadEmail = String(tracker.json.Lead_Email__c || fmt.leadEmail || '').trim().toLowerCase();\n  const sfStartISO = String(tracker.json.Meeting_Start_Date_Time__c || '');\n\n  if (!iCalUID) {\n    results.push({ json: { noEligible: true, skipReason: '1h guard: Outlook_Event_ID__c is empty — cannot verify event' } });\n    continue;\n  }\n\n  if (!leadEmail) {\n    results.push({ json: { noEligible: true, skipReason: '1h guard: Lead_Email__c is empty — cannot verify attendee' } });\n    continue;\n  }\n\n  const matchingEvents = outlookItems.filter(item =>\n    String(item.json.iCalUId || '').trim() === iCalUID\n  );\n\n  if (matchingEvents.length === 0) {\n    results.push({ json: { noEligible: true, skipReason: '1h guard: no Outlook event found for iCalUID — event may be deleted or missing. W12A will sync status.' } });\n    continue;\n  }\n\n  if (matchingEvents.length > 1) {\n    results.push({ json: { noEligible: true, skipReason: '1h guard: ' + matchingEvents.length + ' Outlook events matched iCalUID — ambiguous, blocking reminder.' } });\n    continue;\n  }\n\n  const liveEvent = matchingEvents[0].json;\n\n  if (liveEvent.isCancelled === true) {\n    results.push({ json: { noEligible: true, skipReason: '1h guard: Outlook event is cancelled (isCancelled=true). W12A will sync status.' } });\n    continue;\n  }\n\n  const attendees = Array.isArray(liveEvent.attendees) ? liveEvent.attendees : [];\n  const leadAttendee = attendees.find(a => {\n    const addr = String(a.emailAddress?.address || '').trim().toLowerCase();\n    return addr === leadEmail && !INTERNAL_EMAILS.includes(addr);\n  });\n\n  if (!leadAttendee) {\n    results.push({ json: { noEligible: true, skipReason: '1h guard: lead ' + leadEmail + ' not found in Outlook attendees (' + attendees.length + ' total). W12A will sync.' } });\n    continue;\n  }\n\n  // RSVP check removed — per current policy, non-accepted RSVPs are allowed.\n  // const rsvp = String(leadAttendee.status?.response || '').trim().toLowerCase();\n  // if (rsvp !== 'accepted') { ... }\n\n  if (sfStartISO && liveEvent.start?.dateTime) {\n    const sfMs = new Date(sfStartISO).getTime();\n    const outlookMs = new Date(liveEvent.start.dateTime).getTime();\n    const diffSec = Math.abs(sfMs - outlookMs) / 1000;\n    if (diffSec > TIME_TOLERANCE_SEC) {\n      results.push({ json: { noEligible: true, skipReason: '1h guard: Outlook start differs from Salesforce by ' + Math.round(diffSec) + 's — blocking. W12A will sync updated time first.' } });\n      continue;\n    }\n  }\n\n  results.push({ json: { ...fmt } });\n}\n\nreturn results.length > 0 ? results : [{ json: { noEligible: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_029",
+      "name": "RSVP / Event Guard (1h)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        672
+      ]
+    }
+  ],
+  "connections": {
+    "Query 24h Eligible Trackers": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead Name (24h)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Lead Name (24h)": {
+      "main": [
+        [
+          {
+            "node": "Format 24h Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eligible 24h?": {
+      "main": [
+        [
+          {
+            "node": "Draft Mode? (24h)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No 24h Reminders Due",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Mode? (24h)": {
+      "main": [
+        [
+          {
+            "node": "Create Draft (24h)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Outlook Event (24h)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Live Email (24h)": {
+      "main": [
+        [
+          {
+            "node": "Update Tracker — 24h Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query 1h Eligible Trackers": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead Name (1h)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Lead Name (1h)": {
+      "main": [
+        [
+          {
+            "node": "Format 1h Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format 1h Email": {
+      "main": [
+        [
+          {
+            "node": "Eligible 1h?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eligible 1h?": {
+      "main": [
+        [
+          {
+            "node": "Draft Mode? (1h)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No 1h Reminders Due",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Mode? (1h)": {
+      "main": [
+        [
+          {
+            "node": "Create Draft (1h)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Outlook Event (1h)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Live Email (1h)": {
+      "main": [
+        [
+          {
+            "node": "Update Tracker — 1h Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meeting Reminder Config": {
+      "main": [
+        [
+          {
+            "node": "Query 24h Eligible Trackers",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Query 1h Eligible Trackers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Admin Run": {
+      "main": [
+        [
+          {
+            "node": "Meeting Reminder Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format 24h Email": {
+      "main": [
+        [
+          {
+            "node": "Validate 24h Timing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate 24h Timing": {
+      "main": [
+        [
+          {
+            "node": "Eligible 24h?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Every 30 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Meeting Reminder Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Outlook Event (24h)": {
+      "main": [
+        [
+          {
+            "node": "RSVP / Event Guard (24h)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSVP / Event Guard (24h)": {
+      "main": [
+        [
+          {
+            "node": "Send Live Email (24h)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Outlook Event (1h)": {
+      "main": [
+        [
+          {
+            "node": "RSVP / Event Guard (1h)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSVP / Event Guard (1h)": {
+      "main": [
+        [
+          {
+            "node": "Send Live Email (1h)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "nodeGroups": [],
+  "tags": []
+}

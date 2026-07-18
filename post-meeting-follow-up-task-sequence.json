@@ -1,0 +1,525 @@
+{
+  "name": "Post-Meeting Follow-Up Task Sequence",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "SAMPLE_NODE_ID_001",
+      "name": "Poll Post Meeting Follow Up Leads",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -2912,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg1",
+              "name": "defaultOwnerId",
+              "type": "string",
+              "value": "SAMPLE_RECORD_ID"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_002",
+      "name": "Post-Meeting Follow-Up Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2688,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "=SELECT Id, Name, Email, OwnerId, Status, Engagement_Status__c, IsConverted, Human_Override__c FROM Lead WHERE Engagement_Status__c = 'Post Meeting Follow Up' AND IsConverted = false AND IsDeleted = false AND Status NOT IN ('Unqualified','Closed','Disqualified') AND (Human_Override__c = false OR Human_Override__c = null) ORDER BY LastModifiedDate ASC LIMIT 100"
+      },
+      "id": "SAMPLE_NODE_ID_003",
+      "name": "Fetch Post Meeting Follow Up Leads",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -2464,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ (function() {\n  const leads = $('Fetch Post Meeting Follow Up Leads').all();\n  if (!leads.length) return \"SELECT Id, WhoId, Subject, ActivityDate, CreatedDate FROM Task WHERE Id = null LIMIT 1\";\n  const esc = (s) => String(s).replace(/'/g, \"\\\\'\");\n  const subjects = [\n    'Follow Up Day_0 send email #1',\n    'Follow Up Day_5 call lead #1',\n    'Follow Up Day_8 send email #2',\n    'Follow Up Day_11 call lead #2',\n    'Follow Up Day_14 call lead #3',\n    'Follow Up Day_21 email lead #3',\n    'Follow Up Day_21 review lead status'\n  ];\n  const subjectList = subjects.map((s) => \"'\" + esc(s) + \"'\").join(', ');\n  const leadIds = leads.map((l) => \"'\" + esc(l.json.Id) + \"'\").join(', ');\n  return \"SELECT Id, WhoId, Subject, ActivityDate, CreatedDate FROM Task WHERE WhoId IN (\" + leadIds + \") AND Subject IN (\" + subjectList + \") LIMIT 1000\";\n})() }}"
+      },
+      "id": "SAMPLE_NODE_ID_004",
+      "name": "Fetch Sequence Tasks (Batch)",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -2240,
+        224
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const STEPS = [\n  { key: 'Day_0', offsetDays: 0, subject: 'Follow Up Day_0 send email #1', notes: 'Email lead #1' },\n  { key: 'Day_5', offsetDays: 5, subject: 'Follow Up Day_5 call lead #1', notes: 'Call lead #1' },\n  { key: 'Day_8', offsetDays: 8, subject: 'Follow Up Day_8 send email #2', notes: 'Email lead #2' },\n  { key: 'Day_11', offsetDays: 11, subject: 'Follow Up Day_11 call lead #2', notes: 'Call lead #2' },\n  { key: 'Day_14', offsetDays: 14, subject: 'Follow Up Day_14 call lead #3', notes: 'Call lead #3' },\n  { key: 'Day_21_Email', offsetDays: 21, subject: 'Follow Up Day_21 email lead #3', notes: 'Email lead' },\n  { key: 'Day_21_Review', offsetDays: 21, subject: 'Follow Up Day_21 review lead status', notes: 'Review lead status' }\n];\n\nconst DAY0_SUBJECT = 'Follow Up Day_0 send email #1';\nconst tz = 'America/Los_Angeles';\nconst todayStr = new Date().toLocaleDateString('en-CA', { timeZone: tz });\n\nfunction addDays(dateStr, days) {\n  const [y, m, d] = dateStr.split('-').map(Number);\n  const dt = new Date(Date.UTC(y, m - 1, d + days));\n  return dt.toISOString().slice(0, 10);\n}\n\nfunction buildStepResult(lead, step, anchorDate) {\n  const leadId = String(lead.Id || '');\n  const stepIndex = STEPS.findIndex((s) => s.key === step.key);\n  const isFinalStep = step.key === 'Day_21_Review';\n  const effectiveAnchor = anchorDate || todayStr;\n  const isDay0Bootstrap = step.offsetDays === 0 && !anchorDate;\n  const rawDueDateStr = isDay0Bootstrap ? todayStr : addDays(effectiveAnchor, step.offsetDays);\n  let nextFollowUpRawDateStr = '';\n  if (!isFinalStep && step.key !== 'Day_21_Email') {\n    const nextStep = STEPS[stepIndex + 1];\n    nextFollowUpRawDateStr = addDays(effectiveAnchor, nextStep.offsetDays);\n  }\n  return {\n    json: {\n      leadId,\n      sequenceKey: leadId + '_PostMeeting',\n      leadName: String(lead.Name || ''),\n      leadEmail: String(lead.Email || ''),\n      leadOwnerId: String(lead.OwnerId || ''),\n      anchorDate: effectiveAnchor,\n      stepKey: step.key,\n      stepIndex,\n      taskSubject: step.subject,\n      taskNotes: step.notes,\n      isFinalStep,\n      rawDueDateStr,\n      nextFollowUpRawDateStr,\n      nextDueDateStr: nextFollowUpRawDateStr,\n      todayStr\n    }\n  };\n}\n\nconst tasksByLead = {};\nconst day0AnchorByLead = {};\n\nfor (const t of $('Fetch Sequence Tasks (Batch)').all()) {\n  const who = String(t.json.WhoId || '');\n  const subj = String(t.json.Subject || '');\n  if (!who || !subj) continue;\n  if (!tasksByLead[who]) tasksByLead[who] = new Set();\n  tasksByLead[who].add(subj);\n\n  if (subj === DAY0_SUBJECT) {\n    const activityDate = String(t.json.ActivityDate || '').slice(0, 10);\n    const createdDate = String(t.json.CreatedDate || '').slice(0, 10);\n    const anchor = activityDate || createdDate;\n    if (anchor && (!day0AnchorByLead[who] || anchor < day0AnchorByLead[who])) {\n      day0AnchorByLead[who] = anchor;\n    }\n  }\n}\n\nconst results = [];\n\nfor (const item of $('Fetch Post Meeting Follow Up Leads').all()) {\n  const lead = item.json;\n  const leadId = String(lead.Id || '');\n  if (!leadId) continue;\n\n  const existingSubjects = tasksByLead[leadId] || new Set();\n  const anchorDate = day0AnchorByLead[leadId] || null;\n  const stepsToCreate = [];\n\n  if (!anchorDate) {\n    if (!existingSubjects.has(DAY0_SUBJECT)) {\n      stepsToCreate.push(STEPS[0]);\n    }\n  } else {\n    for (let i = 1; i < STEPS.length; i++) {\n      const step = STEPS[i];\n      if (existingSubjects.has(step.subject)) continue;\n\n      if (step.offsetDays < 21) {\n        stepsToCreate.push(step);\n        break;\n      }\n\n      if (step.offsetDays === 21) {\n        for (let j = i; j < STEPS.length; j++) {\n          const day21Step = STEPS[j];\n          if (day21Step.offsetDays !== 21) break;\n          if (!existingSubjects.has(day21Step.subject)) {\n            stepsToCreate.push(day21Step);\n          }\n        }\n        break;\n      }\n    }\n  }\n\n  for (const step of stepsToCreate) {\n    const built = buildStepResult(lead, step, anchorDate);\n    // Only create when raw calendar due date is today or earlier (no W11 business-day adjustment)\n    if (built.json.rawDueDateStr > todayStr) continue;\n    results.push(built);\n  }\n}\n\nreturn results;"
+      },
+      "id": "SAMPLE_NODE_ID_005",
+      "name": "Determine Due Sequence Step",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2016,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ (function() {\n  const items = $('Determine Due Sequence Step').all();\n  if (!items.length) return \"SELECT Id, WhoId, Subject FROM Task WHERE Id = null LIMIT 1\";\n  const esc = (s) => String(s).replace(/'/g, \"\\\\'\");\n  const conditions = items.map((i) => \"(WhoId = '\" + esc(i.json.leadId) + \"' AND Subject = '\" + esc(i.json.taskSubject) + \"')\").join(' OR ');\n  return \"SELECT Id, WhoId, Subject FROM Task WHERE \" + conditions + \" LIMIT \" + (items.length + 10);\n})() }}"
+      },
+      "id": "SAMPLE_NODE_ID_006",
+      "name": "Check Existing Tasks (Batch)",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -1344,
+        224
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const existing = new Set();\nfor (const t of $('Check Existing Tasks (Batch)').all()) {\n  const who = String(t.json.WhoId || '');\n  const subj = String(t.json.Subject || '');\n  if (!who || !subj) continue;\n  existing.add(who + '|' + subj);\n}\n\nconst results = [];\nfor (const item of $('Determine Due Sequence Step').all()) {\n  const d = item.json;\n  const key = d.leadId + '|' + d.taskSubject;\n  results.push({ json: { ...d, taskExists: existing.has(key) } });\n}\nreturn results;"
+      },
+      "id": "SAMPLE_NODE_ID_007",
+      "name": "Normalize Task Existence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1120,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.taskExists }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_008",
+      "name": "Task Already Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -896,
+        224
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_009",
+      "name": "Skip — Task Already Exists",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -672,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "status": "Not Started",
+        "additionalFields": {
+          "activityDate": "={{ $json.todayStr }}",
+          "description": "={{ $json.taskNotes + '\\n\\nLead: ' + $json.leadName + '\\nSequence Step: ' + $json.stepKey + '\\nWorkflow: W14 - Post Meeting Follow Up Task Sequence' }}",
+          "owner": "={{ $json.leadOwnerId || $('Post-Meeting Follow-Up Config').first().json.defaultOwnerId }}",
+          "priority": "Normal",
+          "subject": "={{ $json.taskSubject }}",
+          "whoId": "={{ $json.leadId }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_010",
+      "name": "Create Sequence Task",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -672,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const normalizeItems = $('Normalize Task Existence').all();\nconst results = [];\nfor (const item of $input.all()) {\n  const pi = item.pairedItem?.item;\n  if (pi === undefined || pi === null) continue;\n  const ctx = normalizeItems[pi]?.json;\n  if (!ctx || !ctx.leadId || ctx.taskExists === true) continue;\n  results.push({ json: { ...ctx } });\n}\nreturn results;"
+      },
+      "id": "SAMPLE_NODE_ID_011",
+      "name": "Recover Context After Create",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isFinalStep }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_012",
+      "name": "Final Step?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -224,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.stepKey }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "Day_21_Email"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_013",
+      "name": "Day 21 Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_014",
+      "name": "Skip — Day 21 Email EST Tracking",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        224,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "upsert",
+        "customObject": "Engagement_Status_Tracker__c",
+        "externalId": "Sequence_Key__c",
+        "externalIdValue": "={{ $json.sequenceKey }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Sequence_Key__c",
+              "value": "={{ $json.sequenceKey }}"
+            },
+            {
+              "fieldId": "Related_Lead__c",
+              "value": "={{ $json.leadId }}"
+            },
+            {
+              "fieldId": "Active_Sequence_Step__c",
+              "value": "={{ $json.stepKey }}"
+            },
+            {
+              "fieldId": "Last_Sequence_Step_Sent__c",
+              "value": "={{ $json.stepKey }}"
+            },
+            {
+              "fieldId": "Next_Follow_Up_Date_Lead__c",
+              "value": "={{ $json.nextDueDateStr }}"
+            },
+            {
+              "fieldId": "Last_Sequence_Action_At__c",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_015",
+      "name": "Update EST Sequence Tracking",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "upsert",
+        "customObject": "Engagement_Status_Tracker__c",
+        "externalId": "Sequence_Key__c",
+        "externalIdValue": "={{ $json.sequenceKey }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Sequence_Key__c",
+              "value": "={{ $json.sequenceKey }}"
+            },
+            {
+              "fieldId": "Related_Lead__c",
+              "value": "={{ $json.leadId }}"
+            },
+            {
+              "fieldId": "Active_Sequence_Step__c",
+              "value": "={{ $json.stepKey }}"
+            },
+            {
+              "fieldId": "Last_Sequence_Step_Sent__c",
+              "value": "={{ $json.stepKey }}"
+            },
+            {
+              "fieldId": "Last_Sequence_Action_At__c",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_016",
+      "name": "Update EST Sequence Tracking (Final)",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Poll Post Meeting Follow Up Leads": {
+      "main": [
+        [
+          {
+            "node": "Post-Meeting Follow-Up Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post-Meeting Follow-Up Config": {
+      "main": [
+        [
+          {
+            "node": "Fetch Post Meeting Follow Up Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Post Meeting Follow Up Leads": {
+      "main": [
+        [
+          {
+            "node": "Fetch Sequence Tasks (Batch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Sequence Tasks (Batch)": {
+      "main": [
+        [
+          {
+            "node": "Determine Due Sequence Step",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Due Sequence Step": {
+      "main": [
+        [
+          {
+            "node": "Check Existing Tasks (Batch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Existing Tasks (Batch)": {
+      "main": [
+        [
+          {
+            "node": "Normalize Task Existence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Task Existence": {
+      "main": [
+        [
+          {
+            "node": "Task Already Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task Already Exists?": {
+      "main": [
+        [
+          {
+            "node": "Skip — Task Already Exists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Sequence Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Sequence Task": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context After Create": {
+      "main": [
+        [
+          {
+            "node": "Final Step?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Step?": {
+      "main": [
+        [
+          {
+            "node": "Update EST Sequence Tracking (Final)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Day 21 Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Day 21 Email?": {
+      "main": [
+        [
+          {
+            "node": "Skip — Day 21 Email EST Tracking",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update EST Sequence Tracking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "nodeGroups": [],
+  "tags": []
+}

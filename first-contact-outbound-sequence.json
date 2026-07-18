@@ -1,0 +1,1938 @@
+{
+  "name": "First Contact Outbound Sequence",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "SAMPLE_NODE_ID_001",
+      "name": "Poll Every 60 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1568,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "tm",
+              "name": "testMode",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "tr",
+              "name": "testLeadId",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "teo",
+              "name": "testEmailOverride",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "trst",
+              "name": "testResetTracker",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "tplace",
+              "name": "testPlacementSeed",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "tstep",
+              "name": "testPlaceAtStep",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "tlast",
+              "name": "testLastStepSent",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "temail",
+              "name": "testLastEmailAt",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "loid",
+              "name": "exampleOwnerId",
+              "type": "string",
+              "value": "SAMPLE_RECORD_ID"
+            },
+            {
+              "id": "lm",
+              "name": "batchLimit",
+              "type": "number",
+              "value": 100
+            },
+            {
+              "id": "maxproc",
+              "name": "maxLeadsToProcessPerPoll",
+              "type": "number",
+              "value": 100
+            },
+            {
+              "id": "lookahead",
+              "name": "lookaheadLimit",
+              "type": "number",
+              "value": 100
+            },
+            {
+              "id": "cl",
+              "name": "calendlyLink",
+              "type": "string",
+              "value": "https://calendly.com/example-user/30-min"
+            },
+            {
+              "id": "dcc",
+              "name": "senderCcEmail",
+              "type": "string",
+              "value": "user@example.com"
+            },
+            {
+              "id": "sig",
+              "name": "colleagueSignatureHtml",
+              "type": "string",
+              "value": "<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"font-family: Arial, sans-serif; font-size: 13px; color: #333333; line-height: 1.4;\"><tr><td style=\"padding-bottom: 8px;\"><img src=\"https://example.com/logo-placeholder.png\" alt=\"Example Company\" width=\"200\" style=\"display: block; border: 0;\" /></td></tr><tr><td><strong style=\"font-size: 14px;\">Example Representative</strong></td></tr><tr><td><em>Business Development Representative</em></td></tr><tr><td><strong><em>Example company tagline.</em></strong></td></tr><tr><td><em>Helping customers achieve their goals.</em></td></tr><tr><td style=\"padding-top: 6px;\"><a href=\"mailto:colleague@example.com\" style=\"color: #333333; text-decoration: none;\">colleague@example.com</a></td></tr><tr><td>O 555 010 0001</td></tr><tr><td>M 555 010 0003</td></tr><tr><td><a href=\"https://example.com/\" style=\"color: #0066CC; text-decoration: underline;\">example.com</a></td></tr><tr><td style=\"padding-top: 8px;\"><a href=\"CALENDLY_PLACEHOLDER\" style=\"color: #0066CC; font-weight: bold; text-decoration: none;\">Book a meeting here</a></td></tr></table>"
+            },
+            {
+              "id": "excl",
+              "name": "preGoLiveExcludedLeadIds",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "senderEmail",
+              "name": "senderEmail",
+              "type": "string",
+              "value": "colleague@example.com"
+            },
+            {
+              "id": "holidays",
+              "name": "holidayDates",
+              "type": "string",
+              "value": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_002",
+      "name": "FCO Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1344,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ $('FCO Config').item.json.testMode === true ? ($('FCO Config').item.json.testLeadId ? \"SELECT Id, OwnerId, Owner.Name, Owner.Email, FirstName, LastName, Email, Company, Status, Engagement_Status__c, Last_Meaningful_Contact_Date__c, IsConverted, Next_Meeting_Date__c, MobilePhone FROM Lead WHERE Id = '\" + $('FCO Config').item.json.testLeadId + \"' AND IsConverted = false AND Email != null LIMIT 1\" : \"SELECT Id FROM Lead WHERE Id = null LIMIT 1\") : \"SELECT Id, OwnerId, Owner.Name, Owner.Email, FirstName, LastName, Email, Company, Status, Engagement_Status__c, Last_Meaningful_Contact_Date__c, IsConverted, Next_Meeting_Date__c, MobilePhone FROM Lead WHERE Engagement_Status__c = 'First Contact Outbound' AND IsConverted = false AND Email != null AND Status != 'Unqualified' AND Status != 'Do Not Contact' AND Status != 'Connected' AND Status != 'App Booked' AND Status != 'Follow-Up Requested' ORDER BY LastModifiedDate ASC LIMIT \" + $('FCO Config').item.json.lookaheadLimit }}"
+      },
+      "id": "SAMPLE_NODE_ID_003",
+      "name": "Query Eligible Leads",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -1120,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ \"SELECT Id, Related_Lead__c, Sequence_Status__c, Active_Sequence_Step__c, Next_Follow_Up_Date_Lead__c, Last_Sequence_Step_Sent__c, Last_Sequence_Email_Sent_At__c, Sequence_Key__c FROM Engagement_Status_Tracker__c WHERE Related_Lead__c = '\" + $json.Id + \"' AND Sequence_Key__c = '\" + $json.Id + \"_First_Contact_Outbound_v1' LIMIT 1\" }}"
+      },
+      "id": "SAMPLE_NODE_ID_004",
+      "name": "Find EST Record",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -896,
+        704
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('FCO Config').item.json;\nconst leadItems = $('Query Eligible Leads').all();\nconst now = new Date();\nconst tz = 'America/Los_Angeles';\nconst today = now.toLocaleDateString('en-CA', { timeZone: tz });\nconst currentHour = Number(new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', hourCycle: 'h23' }).format(now));\nconst weekday = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(now);\nconst holidaySet = new Set(String(cfg.holidayDates || '').split(',').map(s => s.trim()).filter(Boolean));\nconst isWeekend = weekday === 'Sat' || weekday === 'Sun';\nconst isHoliday = holidaySet.has(today);\nlet estByLeadId = {};\ntry {\n  for (const r of $('Find EST Record').all()) {\n    const row = r.json; if (!row || !row.Id) continue;\n    const leadId = String(row.Related_Lead__c || String(row.Sequence_Key__c || '').replace('_First_Contact_Outbound_v1', ''));\n    if (leadId) estByLeadId[leadId] = row;\n  }\n} catch(e) { estByLeadId = {}; }\nconst excludedRaw = String(cfg.preGoLiveExcludedLeadIds || '');\nconst excludedIds = new Set(excludedRaw.split(',').map(s => s.trim()).filter(Boolean));\nconst SKIP_STATUSES = ['Unqualified','Do Not Contact','Connected','App Booked','Follow-Up Requested'];\nconst maxProcess = Number(cfg.maxLeadsToProcessPerPoll || 100);\nconst results = [];\nfor (let i = 0; i < leadItems.length; i++) {\n  const lead = leadItems[i].json;\n  const estRaw = estByLeadId[String(lead.Id)] || null;\n  if (lead.IsConverted === true) continue;\n  if (lead.Engagement_Status__c !== 'First Contact Outbound') continue;\n  if (SKIP_STATUSES.includes(lead.Status)) continue;\n  if (lead.Next_Meeting_Date__c) continue;\n  if (estRaw && ['Paused','Stopped','Completed'].includes(estRaw.Sequence_Status__c)) continue;\n  const rawEmail = String(lead.Email || '').trim();\n  if (!rawEmail || !rawEmail.includes('@')) continue;\n  if (!estRaw && excludedIds.has(String(lead.Id))) continue;\n  let currentStep = estRaw ? String(estRaw.Active_Sequence_Step__c || 'Day_0') : 'Day_0';\n  let lastStepSent = estRaw ? String(estRaw.Last_Sequence_Step_Sent__c || '') : '';\n  let lastEmailAt = estRaw ? String(estRaw.Last_Sequence_Email_Sent_At__c || '') : '';\n  let seedNeeded = false;\n  const isTestLead = cfg.testMode === true && String(lead.Id) === String(cfg.testLeadId || '');\n  if (isTestLead && cfg.testResetTracker === true) { currentStep = 'Day_0'; lastStepSent = ''; lastEmailAt = ''; seedNeeded = true; }\n  else if (isTestLead && cfg.testPlacementSeed === true && String(cfg.testPlaceAtStep || '')) {\n    const targetStep = String(cfg.testPlaceAtStep);\n    const SO = ['Day_0','Day_1','Day_3','Day_5','Day_7','Day_10','Day_14','Day_16','Day_18','Day_21','Done'];\n    const estStep = estRaw ? String(estRaw.Active_Sequence_Step__c || '') : '';\n    const ei = SO.indexOf(estStep); const ti = SO.indexOf(targetStep);\n    if (!estRaw || (ei >= 0 && ti >= 0 && ei < ti)) { currentStep = targetStep; lastStepSent = String(cfg.testLastStepSent || ''); lastEmailAt = String(cfg.testLastEmailAt || ''); seedNeeded = true; }\n  }\n  if (currentStep === 'Done') continue;\n  let nextDue = estRaw ? String(estRaw.Next_Follow_Up_Date_Lead__c || today) : today;\n  if (seedNeeded) nextDue = today;\n  if (nextDue > today) continue;\n  if (!isTestLead && (currentHour < 9 || currentHour >= 17)) continue;\n  if (!isTestLead && (isWeekend || isHoliday)) continue;\n  const sendToEmail = (cfg.testMode && isTestLead && String(cfg.testEmailOverride || '').trim()) ? String(cfg.testEmailOverride).trim() : rawEmail;\n  const hasMobilePhone = !!(String(lead.MobilePhone || '').trim());\n  const company = String(lead.Company || 'your company').trim() || 'your company';\n  results.push({ json: { leadId: String(lead.Id), firstName: String(lead.FirstName || 'there'), lastName: String(lead.LastName || ''), email: sendToEmail, leadEmail: rawEmail, company, leadStatus: String(lead.Status || ''), engagementStatus: 'First Contact Outbound', estId: estRaw ? String(estRaw.Id) : null, estExists: !!estRaw, sequenceKey: String(lead.Id) + '_First_Contact_Outbound_v1', currentStep, nextDue, lastStepSent, lastEmailAt, leadOwnerId: String(lead.OwnerId || cfg.exampleOwnerId || ''), leadOwnerName: String((lead.Owner && lead.Owner.Name) || lead['Owner.Name'] || ''), leadOwnerEmail: String((lead.Owner && lead.Owner.Email) || lead['Owner.Email'] || ''), exampleOwnerId: String(cfg.exampleOwnerId), calendlyLink: String(cfg.calendlyLink), colleagueSignatureHtml: String(cfg.colleagueSignatureHtml || ''), senderCcEmail: String(cfg.senderCcEmail || ''), senderEmail: String(cfg.senderEmail || 'colleague@example.com'), hasMobilePhone, testMode: cfg.testMode === true, today, seedNeeded } });\n}\nconst capped = results.slice(0, maxProcess);\nreturn capped.length > 0 ? capped : [{ json: { noEligibleLeads: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_005",
+      "name": "Normalize Lead + EST Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "e",
+              "leftValue": "={{ $json.leadId }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_006",
+      "name": "Eligible Leads?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -448,
+        704
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_007",
+      "name": "Poll Complete — Stop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "seed",
+              "leftValue": "={{ $json.seedNeeded }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_008",
+      "name": "Seed Needed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "upsert",
+        "customObject": "Engagement_Status_Tracker__c",
+        "externalId": "Sequence_Key__c",
+        "externalIdValue": "={{ $json.sequenceKey }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Sequence_Key__c",
+              "value": "={{ $json.sequenceKey }}"
+            },
+            {
+              "fieldId": "Related_Lead__c",
+              "value": "={{ $json.leadId }}"
+            },
+            {
+              "fieldId": "Active_Sequence_Step__c",
+              "value": "={{ $json.currentStep }}"
+            },
+            {
+              "fieldId": "Last_Sequence_Step_Sent__c",
+              "value": "={{ $json.lastStepSent }}"
+            },
+            {
+              "fieldId": "Last_Sequence_Email_Sent_At__c",
+              "value": "={{ $json.lastEmailAt }}"
+            },
+            {
+              "fieldId": "Next_Follow_Up_Date_Lead__c",
+              "value": "={{ $json.today }}"
+            },
+            {
+              "fieldId": "Sequence_Status__c",
+              "value": "Active"
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_009",
+      "name": "Upsert Seed EST",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Split In Batches — Process One Lead').item.json;\nif (!ctx || !ctx.leadId) return [{ json: { noEligibleLeads: true } }];\nreturn [{ json: { ...ctx, estExists: true, seedNeeded: false, estSeeded: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_010",
+      "name": "Recover Context After Seed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const STEP_ORDER = ['Day_0','Day_1','Day_3','Day_5','Day_7','Day_10','Day_14','Day_16','Day_18','Day_21','Done'];\nconst STEP_OFFSETS = { Day_0:0,Day_1:1,Day_3:3,Day_5:5,Day_7:7,Day_10:10,Day_14:14,Day_16:16,Day_18:18,Day_21:21 };\nconst EMAIL_STEPS=['Day_0','Day_5','Day_14','Day_21']; const MANUAL_EMAIL_TASK_STEPS=[]; const CALL_TASK_STEPS=['Day_1','Day_7','Day_18']; const SMS_TASK_STEPS=['Day_3','Day_10','Day_16']; const STATUS_REVIEW_STEPS=['Day_21'];\nconst SUBJ={ Day_0:(c)=>'account reporting for '+c, Day_5:()=>'Quick question', Day_14:()=>'How other property managers are using account reporting', Day_21:()=>'Should I close the loop?' };\nconst BODIES={ Day_0:(fn,co,sig,cl)=>'<p style=\"margin:0 0 10px 0; line-height:1.4;\">Hi '+fn+',</p><p style=\"margin:0 0 10px 0; line-height:1.4;\">I was reviewing '+co+' and thought Example Company could be relevant to your team.</p><p style=\"margin:0 0 10px 0; line-height:1.4;\">Example Company helps service organizations report rental payment history to the credit bureaus, giving customers credit for their largest monthly payment while helping operators improve customer engagement, collections, and retention.</p><p style=\"margin:0 0 10px 0; line-height:1.4;\">Would you be open to a brief 15-minute conversation to see if this could be a fit for your organization?</p><p style=\"margin:0 0 10px 0; line-height:1.4;\">Best regards,</p>'+sig.replace('CALENDLY_PLACEHOLDER',cl), Day_5:(fn,sig,cl)=>'<p style=\"margin:0 0 10px 0; line-height:1.4;\">Hi '+fn+',</p><p style=\"margin:0 0 10px 0; line-height:1.4;\">I wanted to follow up on my previous note.</p><p style=\"margin:0 0 10px 0; line-height:1.4;\">Many service organizations initially look at Example Company as a customers benefit, but they also see value through improved payment behavior, stronger customer engagement, and additional differentiation for owners and customers.</p><p style=\"margin:0 0 10px 0; line-height:1.4;\">Is account reporting something your team has evaluated?</p><p style=\"margin:0 0 10px 0; line-height:1.4;\">Best,</p>'+sig.replace('CALENDLY_PLACEHOLDER',cl), Day_14:(fn,sig,cl)=>\"<p style=\\\"margin:0 0 10px 0; line-height:1.4;\\\">Hi \"+fn+\",</p><p style=\\\"margin:0 0 10px 0; line-height:1.4;\\\">One of the reasons our clients implement Example Company is because rent is often a customers's largest monthly expense, yet historically it has not helped build credit.</p><p style=\\\"margin:0 0 10px 0; line-height:1.4;\\\">By reporting rental payments, property managers can offer a meaningful customers benefit while creating additional value for customers, owners, and the management company.</p><p style=\\\"margin:0 0 10px 0; line-height:1.4;\\\">I would be happy to share how other service organizations are implementing the program.</p><p style=\\\"margin:0 0 10px 0; line-height:1.4;\\\">Would next week work for a brief conversation?</p><p style=\\\"margin:0 0 10px 0; line-height:1.4;\\\">Best,</p>\"+sig.replace('CALENDLY_PLACEHOLDER',cl), Day_21:(fn,sig,cl)=>'<p style=\"margin:0 0 10px 0; line-height:1.4;\">Hi '+fn+',</p><p style=\"margin:0 0 10px 0; line-height:1.4;\">I wanted to close the loop on my previous notes.</p><p style=\"margin:0 0 10px 0; line-height:1.4;\">Example Company helps service organizations report rental payment history to the credit bureaus, giving customers credit for their largest monthly payment while helping operators improve customer engagement, collections, and retention.</p><p style=\"margin:0 0 10px 0; line-height:1.4;\">If this is something your team may want to explore, I would be happy to schedule a brief 15-minute conversation.</p><p style=\"margin:0 0 10px 0; line-height:1.4;\">If now is not the right time, no worries at all.</p><p style=\"margin:0 0 10px 0; line-height:1.4;\">Best regards,</p>'+sig.replace('CALENDLY_PLACEHOLDER',cl) };\nconst CQ='Suggested questions:\\n- Are you currently reporting rental payments?\\n- Are you using a customer benefits package?\\n- What customer operations software are you using?\\n- How many units do you currently manage?\\n- Is customers credit building something your team has considered?';\nconst CD={ Day_1:(fn,ln,step,sk)=>'First Contact Outbound sequence — '+step+'\\n\\nLead: '+fn+' '+ln+'\\nSequence Key: '+sk+'\\n\\nAction: Call the lead and attempt to book a brief discovery conversation.\\n\\n'+CQ, Day_7:(fn,ln,step,sk)=>'First Contact Outbound sequence — '+step+'\\n\\nLead: '+fn+' '+ln+'\\nSequence Key: '+sk+'\\n\\nAction: Call the lead and attempt to book a brief discovery conversation.\\n\\n'+CQ, Day_18:(fn,ln,step,sk)=>'First Contact Outbound sequence — '+step+'\\n\\nLead: '+fn+' '+ln+'\\nSequence Key: '+sk+'\\n\\nAction: Call the lead and attempt to book a brief discovery conversation.\\n\\n'+CQ+'\\n\\nThis is the final call attempt in the First Contact Outbound sequence. Leave a voicemail if appropriate.' };\nconst SMS_DESC={ Day_3:(fn)=>'Action: Manually send SMS to lead. Do not send SMS automatically from this workflow.\\n\\nSuggested SMS copy:\\nHi '+fn+', this is Example User with Example Company. I sent over a quick note about account reporting and helping customers build credit through their monthly rent payments. Would you be open to a brief conversation next week?', Day_10:()=>'No SMS copy was provided for this step. Manually send a compliant follow-up SMS only if permitted by company SMS policy.', Day_16:(fn)=>'Action: Manually send SMS to lead. Do not send SMS automatically from this workflow.\\n\\nSuggested SMS copy:\\nHi '+fn+', just checking in. We work with service organizations helping customers build credit through account reporting. If this is something you are evaluating, I would be happy to share a few examples.' };\nconst results=[];\nfor(const item of $input.all()){\n  const ctx=item.json; if(!ctx.leadId) continue;\n  const step=ctx.currentStep; const stepIdx=STEP_ORDER.indexOf(step);\n  const nextStep=(stepIdx>=0&&stepIdx<STEP_ORDER.length-1)?STEP_ORDER[stepIdx+1]:'Done';\n  const isLastStep=step==='Day_21';\n  const needsCallTask=CALL_TASK_STEPS.includes(step); const needsEmailSend=EMAIL_STEPS.includes(step);\n  const needsSmsTask=SMS_TASK_STEPS.includes(step);\n  const needsStatusReview=STATUS_REVIEW_STEPS.includes(step); const needsManualEmailTask=MANUAL_EMAIL_TASK_STEPS.includes(step);\n  const dun=(stepIdx>=0&&STEP_ORDER[stepIdx+1]&&STEP_ORDER[stepIdx+1]!=='Done')?(STEP_OFFSETS[STEP_ORDER[stepIdx+1]]-STEP_OFFSETS[step]):0;\n  const rnd=new Date(); rnd.setDate(rnd.getDate()+dun); const rawNextDateStr=dun>0?rnd.toISOString():new Date().toISOString();\n  let emailSubject=null,emailBodyHtml=null;\n  if(needsEmailSend){ const sf=SUBJ[step]; emailSubject=sf?sf(ctx.company):null; const bf=BODIES[step]; if(bf){ emailBodyHtml=step==='Day_0'?bf(ctx.firstName,ctx.company,ctx.colleagueSignatureHtml,ctx.calendlyLink):bf(ctx.firstName,ctx.colleagueSignatureHtml,ctx.calendlyLink); } }\n  const callTaskSubject=step==='Day_1'?'FCO - Call - Day 1':step==='Day_7'?'FCO - Call - Day 7':'FCO - Call - Day 18';\n  const cdf=CD[step]; const callTaskDescription=cdf?cdf(ctx.firstName,ctx.lastName,step,ctx.sequenceKey):null;\n  const smsTaskSubject=step==='Day_3'?'FCO - SMS - Day 3':step==='Day_10'?'FCO - SMS - Day 10':'FCO - SMS - Day 16';\n  const sdf=SMS_DESC[step]; const smsCopy=sdf?(step==='Day_10'?sdf():sdf(ctx.firstName)):null;\n  const manualEmailTaskSubject=needsManualEmailTask?'FCO - Email - Day 21':null;\n  const manualEmailTaskDescription=needsManualEmailTask?('No email template provided for Day 21. Manually compose and send final email to '+ctx.firstName+' '+ctx.lastName+' at '+ctx.leadEmail+'.'):null;\n  results.push({json:{...ctx,step,nextStep,isLastStep,needsCallTask,needsEmailSend,needsSmsTask,needsStatusReview,needsManualEmailTask,rawNextDateStr,emailSubject,emailBodyHtml,callTaskSubject,callTaskDescription,smsTaskSubject,smsCopy,manualEmailTaskSubject,manualEmailTaskDescription,statusReviewTaskSubject:'FCO - Review - Day 21',statusReviewTaskDescription:'Review this lead after the First Contact Outbound sequence. If there is no response, review the next action and update the lead status manually. Do not automatically move the lead without human review.',w11Timezone:'America/Los_Angeles'}});\n}\nreturn results.length>0?results:[{json:{skip:true}}];"
+      },
+      "id": "SAMPLE_NODE_ID_011",
+      "name": "Build Step Actions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ \"SELECT Id, Sequence_Key__c, Last_Sequence_Email_Sent_At__c FROM Engagement_Status_Tracker__c WHERE Sequence_Key__c = '\" + $json.sequenceKey + \"_\" + $json.step + \"' LIMIT 1\" }}"
+      },
+      "id": "SAMPLE_NODE_ID_012",
+      "name": "Check Existing Step History EST",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        192
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx=$('Build Step Actions').item.json;\nconst lookup=$input.first()?.json||{};\nif(!ctx||!ctx.leadId) return [{json:{skip:true}}];\nconst stepHistoryLogged=!!(lookup&&lookup.Id);\nconst stepHistoryEmailAt=stepHistoryLogged?String(lookup.Last_Sequence_Email_Sent_At__c||ctx.lastEmailAt||''):null;\nreturn [{json:{...ctx,stepHistoryLogged,stepHistoryEstId:stepHistoryLogged?String(lookup.Id):null,stepHistoryEmailAt:stepHistoryEmailAt||null}}];"
+      },
+      "id": "SAMPLE_NODE_ID_013",
+      "name": "Recover Context — Step History Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "shl",
+              "leftValue": "={{ $json.stepHistoryLogged }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_014",
+      "name": "Step Already Logged?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1344,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx=$input.item.json;\nif(!ctx||ctx.skip) return [{json:{...ctx,shouldSendEmail:false,shouldAdvance:false,skipReason:ctx?.skipReason||'skip carried forward'}}];\nconst currentStep=String(ctx.step||'');\nlet estLastStep=String(ctx.lastStepSent||''); let estLastEmailAt=String(ctx.lastEmailAt||'');\ntry{ const estRow=$('Find EST Record').all().find(r=>r.json&&String(r.json.Related_Lead__c)===String(ctx.leadId)); if(estRow&&estRow.json&&estRow.json.Id){estLastStep=String(estRow.json.Last_Sequence_Step_Sent__c||estLastStep);estLastEmailAt=String(estRow.json.Last_Sequence_Email_Sent_At__c||estLastEmailAt);} }catch(e){}\nif(!ctx.needsEmailSend) return [{json:{...ctx,shouldSendEmail:false,shouldAdvance:true,skipEmailReason:'no automated email for this step',emailAlreadySent:false,emailSentThisRun:false}}];\nif(estLastStep===currentStep&&estLastEmailAt) return [{json:{...ctx,shouldSendEmail:false,shouldAdvance:true,skipEmailReason:'Email already sent for step '+currentStep+' at '+estLastEmailAt,emailAlreadySent:true,emailSentThisRun:false,lastEmailAt:estLastEmailAt}}];\nreturn [{json:{...ctx,shouldSendEmail:true,shouldAdvance:true,emailAlreadySent:false,emailSentThisRun:false}}];"
+      },
+      "id": "SAMPLE_NODE_ID_015",
+      "name": "Check Email Send Dedupe",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6048,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "sse",
+              "leftValue": "={{ $json.shouldSendEmail }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_016",
+      "name": "Should Send Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        6272,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "toRecipients": "={{ $json.email }}",
+        "subject": "={{ $json.emailSubject }}",
+        "bodyContent": "={{ $json.emailBodyHtml }}",
+        "additionalFields": {
+          "bodyContentType": "html",
+          "replyTo": "={{ $json.senderEmail }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_017",
+      "name": "Send Automated Email",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        6496,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx=$('Check Email Send Dedupe').item.json;\nif(!ctx||!ctx.leadId) return [{json:{skip:true}}];\nreturn [{json:{...ctx,emailSentThisRun:true,lastEmailAt:new Date().toISOString()}}];"
+      },
+      "id": "SAMPLE_NODE_ID_018",
+      "name": "Recover Context After Send",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6720,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let ctx=null;\ntry{ctx=$('Recover Context After Send').item?.json;}catch(e){}\nif(!ctx||!ctx.leadId){try{ctx=$('Check Email Send Dedupe').item?.json;}catch(e2){}}\nif(!ctx||!ctx.leadId) return [{json:{skip:true}}];\nreturn [{json:{...ctx,shouldAdvance:true}}];"
+      },
+      "id": "SAMPLE_NODE_ID_019",
+      "name": "Merge Email Paths",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6944,
+        192
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_020",
+      "name": "Skip Email Send — Not Needed",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        6720,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ \"SELECT Id, WhoId, Subject FROM Task WHERE WhoId = '\" + $json.leadId + \"' AND Subject = '\" + $json.callTaskSubject + \"' LIMIT 1\" }}"
+      },
+      "id": "SAMPLE_NODE_ID_021",
+      "name": "Check Existing Call Task",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        1568,
+        336
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx=$('Build Step Actions').item.json;\nconst lookup=$input.first()?.json||{};\nif(!ctx||!ctx.leadId) return [{json:{skip:true}}];\nreturn [{json:{...ctx,callTaskExists:!!(lookup&&lookup.Id)}}];"
+      },
+      "id": "SAMPLE_NODE_ID_022",
+      "name": "Recover Context — Call Task Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "nc",
+              "leftValue": "={{ $json.needsCallTask }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "nx",
+              "leftValue": "={{ $json.callTaskExists }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_023",
+      "name": "Needs Call Task?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2016,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "status": "Open",
+        "additionalFields": {
+          "activityDate": "={{ $json.today }}",
+          "description": "={{ $json.callTaskDescription }}",
+          "owner": "={{ $json.leadOwnerId || $json.exampleOwnerId || 'SAMPLE_RECORD_ID' }}",
+          "priority": "High",
+          "subject": "={{ $json.callTaskSubject }}",
+          "whoId": "={{ $json.leadId }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_024",
+      "name": "Create Call Task",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        2240,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx=$('Recover Context — Call Task Check').item.json;\nif(!ctx||!ctx.leadId) return [{json:{skip:true}}];\nreturn [{json:{...ctx}}];"
+      },
+      "id": "SAMPLE_NODE_ID_025",
+      "name": "Recover Context After Call Task",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        336
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_026",
+      "name": "Skip Call Task — Already Exists",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ \"SELECT Id, WhoId, Subject FROM Task WHERE WhoId = '\" + $json.leadId + \"' AND Subject = '\" + $json.smsTaskSubject + \"' LIMIT 1\" }}"
+      },
+      "id": "SAMPLE_NODE_ID_027",
+      "name": "Check Existing SMS Task",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        2688,
+        336
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx=$('Recover Context After Call Task').item.json;\nconst lookup=$input.first()?.json||{};\nif(!ctx||!ctx.leadId) return [{json:{skip:true}}];\nreturn [{json:{...ctx,smsTaskExists:!!(lookup&&lookup.Id)}}];"
+      },
+      "id": "SAMPLE_NODE_ID_028",
+      "name": "Recover Context — SMS Task Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2912,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "ns",
+              "leftValue": "={{ $json.needsSmsTask }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "nsx",
+              "leftValue": "={{ $json.smsTaskExists }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_029",
+      "name": "Needs SMS Task?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3136,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "status": "Open",
+        "additionalFields": {
+          "activityDate": "={{ $json.today }}",
+          "description": "={{ $json.smsCopy }}",
+          "owner": "={{ $json.leadOwnerId || $json.exampleOwnerId || 'SAMPLE_RECORD_ID' }}",
+          "priority": "Normal",
+          "subject": "={{ $json.smsTaskSubject }}",
+          "whoId": "={{ $json.leadId }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_030",
+      "name": "Create SMS Task",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        3360,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx=$('Recover Context — SMS Task Check').item.json;\nif(!ctx||!ctx.leadId) return [{json:{skip:true}}];\nreturn [{json:{...ctx}}];"
+      },
+      "id": "SAMPLE_NODE_ID_031",
+      "name": "Recover Context After SMS Task",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3584,
+        336
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_032",
+      "name": "Skip SMS Task — Already Exists",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3360,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ \"SELECT Id, WhoId, Subject FROM Task WHERE WhoId = '\" + $json.leadId + \"' AND Subject = '\" + $json.statusReviewTaskSubject + \"' LIMIT 1\" }}"
+      },
+      "id": "SAMPLE_NODE_ID_033",
+      "name": "Check Existing Status Review Task",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        4928,
+        336
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx=$('Recover Context After Manual Email Task').item.json;\nconst lookup=$input.first()?.json||{};\nif(!ctx||!ctx.leadId) return [{json:{skip:true}}];\nreturn [{json:{...ctx,statusReviewExists:!!(lookup&&lookup.Id)}}];"
+      },
+      "id": "SAMPLE_NODE_ID_034",
+      "name": "Recover Context — Status Review Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5152,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "nsr",
+              "leftValue": "={{ $json.needsStatusReview }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "nsrx",
+              "leftValue": "={{ $json.statusReviewExists }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_035",
+      "name": "Needs Status Review Task?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5376,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "status": "Open",
+        "additionalFields": {
+          "activityDate": "={{ $json.today }}",
+          "description": "={{ $json.statusReviewTaskDescription }}",
+          "owner": "={{ $json.leadOwnerId || $json.exampleOwnerId || 'SAMPLE_RECORD_ID' }}",
+          "priority": "High",
+          "subject": "={{ $json.statusReviewTaskSubject }}",
+          "whoId": "={{ $json.leadId }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_036",
+      "name": "Create Status Review Task",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        5600,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx=$('Recover Context — Status Review Check').item.json;\nif(!ctx||!ctx.leadId) return [{json:{skip:true}}];\nreturn [{json:{...ctx}}];"
+      },
+      "id": "SAMPLE_NODE_ID_037",
+      "name": "Recover Context After Status Review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5824,
+        336
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_038",
+      "name": "Skip Status Review — Already Exists",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        5600,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ \"SELECT Id, WhoId, Subject FROM Task WHERE WhoId = '\" + $json.leadId + \"' AND Subject = '\" + $json.manualEmailTaskSubject + \"' LIMIT 1\" }}"
+      },
+      "id": "SAMPLE_NODE_ID_039",
+      "name": "Check Existing Manual Email Task",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        3808,
+        336
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx=$('Recover Context After SMS Task').item.json;\nconst lookup=$input.first()?.json||{};\nif(!ctx||!ctx.leadId) return [{json:{skip:true}}];\nreturn [{json:{...ctx,manualEmailTaskExists:!!(lookup&&lookup.Id)}}];"
+      },
+      "id": "SAMPLE_NODE_ID_040",
+      "name": "Recover Context — Manual Email Task Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4032,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "nme",
+              "leftValue": "={{ $json.needsManualEmailTask }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "nmex",
+              "leftValue": "={{ $json.manualEmailTaskExists }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_041",
+      "name": "Needs Manual Email Task?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4256,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "status": "Open",
+        "additionalFields": {
+          "activityDate": "={{ $json.today }}",
+          "description": "={{ $json.manualEmailTaskDescription }}",
+          "owner": "={{ $json.leadOwnerId || $json.exampleOwnerId || 'SAMPLE_RECORD_ID' }}",
+          "priority": "Normal",
+          "subject": "={{ $json.manualEmailTaskSubject }}",
+          "whoId": "={{ $json.leadId }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_042",
+      "name": "Create Manual Email Task",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        4480,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx=$('Recover Context — Manual Email Task Check').item.json;\nif(!ctx||!ctx.leadId) return [{json:{skip:true}}];\nreturn [{json:{...ctx}}];"
+      },
+      "id": "SAMPLE_NODE_ID_043",
+      "name": "Recover Context After Manual Email Task",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4704,
+        336
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_044",
+      "name": "Skip Manual Email Task — Already Exists",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        4480,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "adv",
+              "leftValue": "={{ $json.shouldAdvance }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_045",
+      "name": "Should Advance?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        7168,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_WORKFLOW_ID"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "dateTime": "={{ $json.rawNextDateStr }}",
+            "timezone": "={{ $json.w11Timezone }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "dateTime",
+              "displayName": "dateTime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "timezone",
+              "displayName": "timezone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "SAMPLE_NODE_ID_046",
+      "name": "Call Business-Day Utility",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        7392,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let merged={...($('Should Advance?').item.json||{})};\ntry{const sent=$('Recover Context After Send').item?.json;if(sent&&sent.leadId)merged={...merged,...sent};}catch(e){}\nif(!merged.leadId||merged.skip||merged.shouldAdvance===false) return [{json:{...merged,skip:true,skipReason:merged.skipReason||'cannot advance'}}];\nconst w11=$('Call Business-Day Utility').item?.json||{};\nlet nextDueDateStr=null;\nif(w11.isBusinessDay===true){nextDueDateStr=String(w11.localDate||w11.nextBusinessDay||'').substring(0,10);}\nelse{nextDueDateStr=String(w11.nextBusinessDay||'').substring(0,10);}\nif(!nextDueDateStr||nextDueDateStr.length<8) return [{json:{...merged,skip:true,skipReason:'Business-day utility returned no valid date'}}];\nlet emailSentAtForMainEst=merged.lastEmailAt||null;\nif(merged.emailSentThisRun){emailSentAtForMainEst=new Date().toISOString();}else if(merged.emailAlreadySent){emailSentAtForMainEst=merged.lastEmailAt||null;}\nlet stepHistoryEmailAt=null;\nif(merged.needsEmailSend){if(merged.emailSentThisRun)stepHistoryEmailAt=new Date().toISOString();else if(merged.emailAlreadySent)stepHistoryEmailAt=merged.lastEmailAt||null;}\nelse if(merged.needsManualEmailTask&&merged.stepHistoryLogged){stepHistoryEmailAt=merged.stepHistoryEmailAt||merged.lastEmailAt||null;}\nelse if(merged.needsManualEmailTask){stepHistoryEmailAt=new Date().toISOString();}\nreturn [{json:{...merged,nextDueDateStr,emailSentAtForMainEst,stepHistoryEmailAt}}];"
+      },
+      "id": "SAMPLE_NODE_ID_047",
+      "name": "Apply Next Business-Day Date",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7616,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "w11-skip",
+              "leftValue": "={{ $json.skip }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "w11-date",
+              "leftValue": "={{ $json.nextDueDateStr }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_048",
+      "name": "Business-Day Date Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        7840,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "upsert",
+        "customObject": "Engagement_Status_Tracker__c",
+        "externalId": "Sequence_Key__c",
+        "externalIdValue": "={{ $json.sequenceKey }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Sequence_Key__c",
+              "value": "={{ $json.sequenceKey }}"
+            },
+            {
+              "fieldId": "Related_Lead__c",
+              "value": "={{ $json.leadId }}"
+            },
+            {
+              "fieldId": "Active_Sequence_Step__c",
+              "value": "={{ $json.nextStep }}"
+            },
+            {
+              "fieldId": "Last_Sequence_Step_Sent__c",
+              "value": "={{ $json.step }}"
+            },
+            {
+              "fieldId": "Next_Follow_Up_Date_Lead__c",
+              "value": "={{ $json.isLastStep ? null : $json.nextDueDateStr }}"
+            },
+            {
+              "fieldId": "Last_Sequence_Email_Sent_At__c",
+              "value": "={{ $json.emailSentAtForMainEst }}"
+            },
+            {
+              "fieldId": "Sequence_Status__c",
+              "value": "={{ $json.isLastStep ? 'Completed' : 'Active' }}"
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_049",
+      "name": "Update EST — Advance Step",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        8064,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "upsert",
+        "customObject": "Engagement_Status_Tracker__c",
+        "externalId": "Sequence_Key__c",
+        "externalIdValue": "={{ $json.sequenceKey + '_' + $json.step }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Sequence_Key__c",
+              "value": "={{ $json.sequenceKey + '_' + $json.step }}"
+            },
+            {
+              "fieldId": "Related_Lead__c",
+              "value": "={{ $json.leadId }}"
+            },
+            {
+              "fieldId": "Active_Sequence_Step__c",
+              "value": "={{ $json.step }}"
+            },
+            {
+              "fieldId": "Last_Sequence_Step_Sent__c",
+              "value": "={{ $json.step }}"
+            },
+            {
+              "fieldId": "Last_Sequence_Email_Sent_At__c",
+              "value": "={{ $json.stepHistoryEmailAt }}"
+            },
+            {
+              "fieldId": "Next_Follow_Up_Date_Lead__c",
+              "value": "={{ $json.nextDueDateStr }}"
+            },
+            {
+              "fieldId": "Sequence_Status__c",
+              "value": "Completed"
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_050",
+      "name": "Upsert Step History EST",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        8288,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_051",
+      "name": "Split In Batches — Process One Lead",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -224,
+        528
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_052",
+      "name": "Skip Lead — Invalid W11 Date",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        8064,
+        368
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_053",
+      "name": "Skip — Cannot Advance",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        7392,
+        464
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_054",
+      "name": "No Eligible Leads — Stop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        720
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_055",
+      "name": "Manual Admin Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1568,
+        720
+      ]
+    }
+  ],
+  "connections": {
+    "Poll Every 60 Minutes": {
+      "main": [
+        [
+          {
+            "node": "FCO Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FCO Config": {
+      "main": [
+        [
+          {
+            "node": "Query Eligible Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Eligible Leads": {
+      "main": [
+        [
+          {
+            "node": "Find EST Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find EST Record": {
+      "main": [
+        [
+          {
+            "node": "Normalize Lead + EST Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Lead + EST Context": {
+      "main": [
+        [
+          {
+            "node": "Eligible Leads?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eligible Leads?": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches — Process One Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Eligible Leads — Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seed Needed?": {
+      "main": [
+        [
+          {
+            "node": "Upsert Seed EST",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Step Actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Seed EST": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After Seed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context After Seed": {
+      "main": [
+        [
+          {
+            "node": "Build Step Actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Step Actions": {
+      "main": [
+        [
+          {
+            "node": "Check Existing Step History EST",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Existing Step History EST": {
+      "main": [
+        [
+          {
+            "node": "Recover Context — Step History Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context — Step History Check": {
+      "main": [
+        [
+          {
+            "node": "Step Already Logged?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step Already Logged?": {
+      "main": [
+        [
+          {
+            "node": "Check Email Send Dedupe",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Existing Call Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Email Send Dedupe": {
+      "main": [
+        [
+          {
+            "node": "Should Send Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Send Email?": {
+      "main": [
+        [
+          {
+            "node": "Send Automated Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip Email Send — Not Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Automated Email": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context After Send": {
+      "main": [
+        [
+          {
+            "node": "Merge Email Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Email Send — Not Needed": {
+      "main": [
+        [
+          {
+            "node": "Merge Email Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Existing Call Task": {
+      "main": [
+        [
+          {
+            "node": "Recover Context — Call Task Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context — Call Task Check": {
+      "main": [
+        [
+          {
+            "node": "Needs Call Task?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Call Task?": {
+      "main": [
+        [
+          {
+            "node": "Create Call Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip Call Task — Already Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Call Task": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After Call Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Call Task — Already Exists": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After Call Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Existing SMS Task": {
+      "main": [
+        [
+          {
+            "node": "Recover Context — SMS Task Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context — SMS Task Check": {
+      "main": [
+        [
+          {
+            "node": "Needs SMS Task?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs SMS Task?": {
+      "main": [
+        [
+          {
+            "node": "Create SMS Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip SMS Task — Already Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create SMS Task": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After SMS Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip SMS Task — Already Exists": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After SMS Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Existing Status Review Task": {
+      "main": [
+        [
+          {
+            "node": "Recover Context — Status Review Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context — Status Review Check": {
+      "main": [
+        [
+          {
+            "node": "Needs Status Review Task?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Status Review Task?": {
+      "main": [
+        [
+          {
+            "node": "Create Status Review Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip Status Review — Already Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Status Review Task": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After Status Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Status Review — Already Exists": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After Status Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Existing Manual Email Task": {
+      "main": [
+        [
+          {
+            "node": "Recover Context — Manual Email Task Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context — Manual Email Task Check": {
+      "main": [
+        [
+          {
+            "node": "Needs Manual Email Task?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Manual Email Task?": {
+      "main": [
+        [
+          {
+            "node": "Create Manual Email Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip Manual Email Task — Already Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Manual Email Task": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After Manual Email Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Manual Email Task — Already Exists": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After Manual Email Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Advance?": {
+      "main": [
+        [
+          {
+            "node": "Call Business-Day Utility",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip — Cannot Advance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Business-Day Utility": {
+      "main": [
+        [
+          {
+            "node": "Apply Next Business-Day Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Next Business-Day Date": {
+      "main": [
+        [
+          {
+            "node": "Business-Day Date Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Business-Day Date Valid?": {
+      "main": [
+        [
+          {
+            "node": "Update EST — Advance Step",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip Lead — Invalid W11 Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update EST — Advance Step": {
+      "main": [
+        [
+          {
+            "node": "Upsert Step History EST",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Step History EST": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches — Process One Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches — Process One Lead": {
+      "main": [
+        [
+          {
+            "node": "Poll Complete — Stop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Seed Needed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Lead — Invalid W11 Date": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches — Process One Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip — Cannot Advance": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches — Process One Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Admin Run": {
+      "main": [
+        [
+          {
+            "node": "FCO Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context After Call Task": {
+      "main": [
+        [
+          {
+            "node": "Check Existing SMS Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context After SMS Task": {
+      "main": [
+        [
+          {
+            "node": "Check Existing Manual Email Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context After Manual Email Task": {
+      "main": [
+        [
+          {
+            "node": "Check Existing Status Review Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context After Status Review": {
+      "main": [
+        [
+          {
+            "node": "Check Email Send Dedupe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Email Paths": {
+      "main": [
+        [
+          {
+            "node": "Should Advance?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "nodeGroups": [],
+  "tags": []
+}

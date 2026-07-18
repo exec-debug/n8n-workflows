@@ -1,0 +1,1786 @@
+{
+  "name": "Meeting Booked Detection",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "internalDomains",
+              "type": "array",
+              "value": [
+                "example.com"
+              ]
+            },
+            {
+              "id": "c2",
+              "name": "senderEmail",
+              "type": "string",
+              "value": "user@example.com"
+            },
+            {
+              "id": "c3",
+              "name": "colleagueEmail",
+              "type": "string",
+              "value": "colleague@example.com"
+            },
+            {
+              "id": "c4",
+              "name": "exampleOwnerId",
+              "type": "string",
+              "value": "SAMPLE_RECORD_ID"
+            },
+            {
+              "id": "c5",
+              "name": "testMode",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "c6",
+              "name": "testAllowedEventId",
+              "type": "string",
+              "value": "SAMPLE_RECORD_ID"
+            },
+            {
+              "id": "c7",
+              "name": "lookaheadDays",
+              "type": "number",
+              "value": 30
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_001",
+      "name": "Meeting Detection Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -6496,
+        288
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_002",
+      "name": "Run W7 Manually (Test)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -6720,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "includeRecurringInstances": true,
+        "startDateTime": "={{ $now.toISO() }}",
+        "endDateTime": "={{ $now.plus({ days: 30 }).toISO() }}",
+        "returnAll": true,
+        "output": "fields",
+        "fields": [
+          "attendees",
+          "organizer",
+          "start",
+          "end",
+          "subject",
+          "iCalUId",
+          "isCancelled",
+          "lastModifiedDateTime",
+          "isAllDay",
+          "bodyPreview",
+          "body"
+        ]
+      },
+      "id": "SAMPLE_NODE_ID_003",
+      "name": "Fetch Example User's Calendar Events",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        -6272,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nfor (const item of $input.all()) {\n  const e = item.json;\n  if (!e || e.noEvents) continue;\n  const eid = String(e.iCalUId || e.id || '');\n  // Combine bodyPreview + body.content for richer text matching\n  const bodyPreview = String(e.bodyPreview || '');\n  const bodyContent = (e.body && e.body.content) ? String(e.body.content) : '';\n  const combinedBody = bodyPreview + (bodyContent ? '\\n' + bodyContent : '');\n  results.push({ json: {\n    calendarSource: 'Primary',\n    calendarOwnerEmail: 'user@example.com',\n    outlookEventId: eid,\n    subject: String(e.subject || ''),\n    startDateTime: e.start ? String(e.start.dateTime || '') : '',\n    startTimezone: e.start ? String(e.start.timeZone || '') : '',\n    endDateTime: e.end ? String(e.end.dateTime || '') : '',\n    organizerEmail: e.organizer && e.organizer.emailAddress ? String(e.organizer.emailAddress.address || '') : '',\n    organizerName: e.organizer && e.organizer.emailAddress ? String(e.organizer.emailAddress.name || '') : '',\n    attendeesRaw: Array.isArray(e.attendees) ? e.attendees : [],\n    isCancelled: e.isCancelled === true,\n    isAllDay: e.isAllDay === true,\n    lastModified: String(e.lastModifiedDateTime || ''),\n    bodyPreview: combinedBody\n  }});\n}\nreturn results.length > 0 ? results : [{ json: { noEvents: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_004",
+      "name": "Normalize Example User's Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6048,
+        192
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_005",
+      "name": "Merge Both Calendars",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -5824,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "includeRecurringInstances": true,
+        "startDateTime": "={{ $now.toISO() }}",
+        "endDateTime": "={{ $now.plus({ days: 30 }).toISO() }}",
+        "returnAll": true,
+        "output": "fields",
+        "fields": [
+          "attendees",
+          "organizer",
+          "start",
+          "end",
+          "subject",
+          "iCalUId",
+          "isCancelled",
+          "lastModifiedDateTime",
+          "isAllDay",
+          "bodyPreview",
+          "body"
+        ]
+      },
+      "id": "SAMPLE_NODE_ID_006",
+      "name": "Fetch Example Representative's Calendar Events",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        -6272,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nfor (const item of $input.all()) {\n  const e = item.json;\n  if (!e || e.noEvents) continue;\n  const eid = String(e.iCalUId || e.id || '');\n  const bodyPreview = String(e.bodyPreview || '');\n  const bodyContent = (e.body && e.body.content) ? String(e.body.content) : '';\n  const combinedBody = bodyPreview + (bodyContent ? '\\n' + bodyContent : '');\n  results.push({ json: {\n    calendarSource: 'Example Representative',\n    calendarOwnerEmail: 'colleague@example.com',\n    outlookEventId: eid,\n    subject: String(e.subject || ''),\n    startDateTime: e.start ? String(e.start.dateTime || '') : '',\n    startTimezone: e.start ? String(e.start.timeZone || '') : '',\n    endDateTime: e.end ? String(e.end.dateTime || '') : '',\n    organizerEmail: e.organizer && e.organizer.emailAddress ? String(e.organizer.emailAddress.address || '') : '',\n    organizerName: e.organizer && e.organizer.emailAddress ? String(e.organizer.emailAddress.name || '') : '',\n    attendeesRaw: Array.isArray(e.attendees) ? e.attendees : [],\n    isCancelled: e.isCancelled === true,\n    isAllDay: e.isAllDay === true,\n    lastModified: String(e.lastModifiedDateTime || ''),\n    bodyPreview: combinedBody\n  }});\n}\nreturn results.length > 0 ? results : [{ json: { noEvents: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_007",
+      "name": "Normalize Example Representative's Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6048,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const internalDomains = ['example.com'];\nconst testMode = $('Meeting Detection Config').item.json.testMode === true;\nconst testAllowedEventId = String($('Meeting Detection Config').item.json.testAllowedEventId || '');\n\nfunction isInternal(email) {\n  if (!email) return true;\n  const domain = (email.split('@')[1] || '').toLowerCase();\n  return internalDomains.some(d => domain === d.toLowerCase());\n}\n\nfunction isValidEmail(email) {\n  return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);\n}\n\n// Parse invitee email from Calendly-style body text.\n// Checks multiple patterns and handles \\r\\n line endings.\nfunction parseCalendlyEmail(text) {\n  if (!text) return null;\n  // Strip HTML tags if present\n  const plain = text.replace(/<[^>]+>/g, ' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');\n  const patterns = [\n    /Invitee\\s+Email\\s*:\\s*([^\\s\\r\\n,<>\"]+)/i,\n    /Guest\\s+Email\\s*:\\s*([^\\s\\r\\n,<>\"]+)/i,\n    /mailto:([^\\s\\r\\n,<>\"?]+@[^\\s\\r\\n,<>\"?]+)/i\n  ];\n  for (const pattern of patterns) {\n    const match = plain.match(pattern);\n    if (match && match[1]) {\n      const email = match[1].trim().toLowerCase().replace(/[.,;]+$/, '');\n      if (isValidEmail(email)) return email;\n    }\n  }\n  return null;\n}\n\nfunction parseCalendlyName(text) {\n  if (!text) return null;\n  const plain = text.replace(/<[^>]+>/g, ' ');\n  const match = plain.match(/Invitee\\s*:\\s*([^\\r\\n<]+)/i);\n  return match ? match[1].trim() : null;\n}\n\nconst results = [];\nfor (const item of $input.all()) {\n  const e = item.json;\n  if (e.noEvents) continue;\n  if (e.isCancelled === true) continue;\n  if (!e.outlookEventId || !e.startDateTime) continue;\n  if (testMode && e.outlookEventId !== testAllowedEventId) continue;\n\n  const internal = [];\n  const external = [];\n\n  // SOURCE A: Attendees array\n  for (const att of (e.attendeesRaw || [])) {\n    const email = att.emailAddress ? String(att.emailAddress.address || '') : '';\n    const name  = att.emailAddress ? String(att.emailAddress.name  || '') : '';\n    if (!email) continue;\n    if (isInternal(email)) { internal.push(email); }\n    else if (!external.find(a => a.email === email.toLowerCase())) {\n      external.push({ email: email.toLowerCase().trim(), name });\n    }\n  }\n\n  // SOURCE B: Organizer (if external)\n  if (e.organizerEmail && !isInternal(e.organizerEmail)) {\n    if (!external.find(a => a.email === e.organizerEmail.toLowerCase())) {\n      external.push({ email: e.organizerEmail.toLowerCase().trim(), name: e.organizerName });\n    }\n  }\n\n  // SOURCE C: Calendly body parser\n  // Always run — use as primary if no external from A/B,\n  // OR if the only externals found look like system addresses (no Lead match likely)\n  let calendlyParsed = false;\n  const bodyText = String(e.bodyPreview || '');\n  \n  if (external.length === 0) {\n    // No external attendees from A/B — try body parser\n    const parsedEmail = parseCalendlyEmail(bodyText);\n    if (parsedEmail && !isInternal(parsedEmail)) {\n      const parsedName = parseCalendlyName(bodyText) || parsedEmail;\n      external.push({ email: parsedEmail, name: parsedName });\n      calendlyParsed = true;\n    }\n  }\n\n  if (external.length === 0) continue;\n\n  results.push({ json: {\n    calendarSource: String(e.calendarSource || ''),\n    calendarOwnerEmail: String(e.calendarOwnerEmail || ''),\n    outlookEventId: String(e.outlookEventId || ''),\n    subject: String(e.subject || ''),\n    startDateTime: String(e.startDateTime || ''),\n    startTimezone: String(e.startTimezone || ''),\n    endDateTime: String(e.endDateTime || ''),\n    organizerEmail: String(e.organizerEmail || ''),\n    organizerName: String(e.organizerName || ''),\n    bodyPreview: bodyText,\n    internalAttendees: internal.join(', '),\n    externalAttendees: external,\n    externalAttendeeEmails: external.map(a => a.email).join(', '),\n    calendlyParsed\n  }});\n}\nreturn results.length > 0 ? results : [{ json: { noEventsToProcess: true } }];\n"
+      },
+      "id": "SAMPLE_NODE_ID_008",
+      "name": "Filter Events + Classify Attendees",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5600,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const seen = new Set();\nconst results = [];\nfor (const item of $input.all()) {\n  const e = item.json;\n  if (e.noEvents || e.noEventsToProcess || e.noMatchJobs) continue;\n  if (!e.outlookEventId || !e.externalAttendees || e.externalAttendees.length === 0) continue;\n  for (const att of e.externalAttendees) {\n    const dedupeKey = e.outlookEventId + '_' + att.email;\n    if (seen.has(dedupeKey)) continue;\n    seen.add(dedupeKey);\n    results.push({ json: {\n      calendarSource: String(e.calendarSource || ''),\n      calendarOwnerEmail: String(e.calendarOwnerEmail || ''),\n      outlookEventId: String(e.outlookEventId || ''),\n      subject: String(e.subject || ''),\n      startDateTime: String(e.startDateTime || ''),\n      startTimezone: String(e.startTimezone || ''),\n      endDateTime: String(e.endDateTime || ''),\n      organizerEmail: String(e.organizerEmail || ''),\n      organizerName: String(e.organizerName || ''),\n      bodyPreview: String(e.bodyPreview || ''),\n      internalAttendees: String(e.internalAttendees || ''),\n      externalAttendeeEmails: String(e.externalAttendeeEmails || ''),\n      currentAttendeeEmail: String(att.email || ''),\n      currentAttendeeName: String(att.name || att.email || ''),\n      calendlyParsed: e.calendlyParsed === true\n    }});\n  }\n}\nif (results.length === 0) return [{ json: { noMatchJobs: true } }];\nreturn results;"
+      },
+      "id": "SAMPLE_NODE_ID_009",
+      "name": "Expand — One Item Per External Attendee",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5376,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ \"SELECT Id, Name, Status, Email, OwnerId FROM Lead WHERE Email = '\" + $json.currentAttendeeEmail + \"' AND IsConverted = false AND IsDeleted = false LIMIT 1\" }}"
+      },
+      "id": "SAMPLE_NODE_ID_010",
+      "name": "Match Attendee Email to Salesforce Lead",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -5152,
+        288
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// EXACT EMAIL MATCH GUARD + FINAL DEDUPE\n// Dictionary: email -> [eventCtx, ...] (one per unique outlookEventId)\n// Hard rule: only one output per unique leadId + outlookEventId + extractedEmail\n\nconst expandItems = $('Expand \\u2014 One Item Per External Attendee').all();\n\n// Build email -> array of expand contexts (one per unique event)\nconst expandByEmail = {};\nfor (const ei of expandItems) {\n  const email = String(ei.json.currentAttendeeEmail || '').toLowerCase().trim();\n  if (email) {\n    if (!expandByEmail[email]) expandByEmail[email] = [];\n    expandByEmail[email].push(ei.json);\n  }\n}\n\nconst seen = new Set(); // dedupe: leadId|outlookEventId|extractedEmail\nconst results = [];\n\nfor (const inputItem of $input.all()) {\n  const item = inputItem.json;\n  const sfEmail = String(item.Email || '').toLowerCase().trim();\n  const sfId    = String(item.Id || '');\n  if (!sfId || sfId.length < 5 || !sfEmail) continue;\n\n  const ctxList = expandByEmail[sfEmail];\n  if (!ctxList || ctxList.length === 0) continue;\n\n  for (const eventCtx of ctxList) {\n    const extractedEmail = String(eventCtx.currentAttendeeEmail || '').toLowerCase().trim();\n    if (extractedEmail !== sfEmail) continue; // hard exact-match guard\n\n    // Final dedupe: one output per unique lead+event+email combination\n    const dedupeKey = sfId + '|' + String(eventCtx.outlookEventId || '') + '|' + extractedEmail;\n    if (seen.has(dedupeKey)) continue;\n    seen.add(dedupeKey);\n\n    results.push({ json: {\n      leadFound: true,\n      leadId: sfId,\n      leadName: String(item.Name || ''),\n      leadStatus: String(item.Status || ''),\n      leadEmail: String(item.Email || ''),\n      leadOwnerId: String(item.OwnerId || ''),\n      totalMeetingsBooked: Number(item.Total_Meetings_Booked__c || 0),\n      calendarSource: String(eventCtx.calendarSource || ''),\n      outlookEventId: String(eventCtx.outlookEventId || ''),\n      subject: String(eventCtx.subject || ''),\n      startDateTime: String(eventCtx.startDateTime || ''),\n      startTimezone: String(eventCtx.startTimezone || ''),\n      endDateTime: String(eventCtx.endDateTime || ''),\n      organizerEmail: String(eventCtx.organizerEmail || ''),\n      organizerName: String(eventCtx.organizerName || ''),\n      internalAttendees: String(eventCtx.internalAttendees || ''),\n      externalAttendeeEmails: String(eventCtx.externalAttendeeEmails || ''),\n      currentAttendeeEmail: String(eventCtx.currentAttendeeEmail || ''),\n      currentAttendeeName: String(eventCtx.currentAttendeeName || ''),\n      calendlyParsed: eventCtx.calendlyParsed === true,\n      sourceType: eventCtx.calendlyParsed ? 'Calendly body parser'\n        : (eventCtx.organizerEmail && eventCtx.organizerEmail.toLowerCase() === extractedEmail)\n          ? 'external organizer'\n          : 'Outlook attendee'\n    }});\n  }\n}\n\nreturn results.length > 0 ? results : [{ json: {\n  leadFound: false, leadId: null, leadEmail: '', currentAttendeeEmail: ''\n}}];"
+      },
+      "id": "SAMPLE_NODE_ID_011",
+      "name": "Normalize Lead Match Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4928,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.leadFound }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_012",
+      "name": "Lead Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -4704,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Runs once for ALL matched leads. Processes each one and outputs one item per lead.\nconst results = [];\nfor (const inputItem of $input.all()) {\n  const d = inputItem.json;\n  if (!d || !d.leadId || !d.outlookEventId) continue;\n\n  const meetingKey = String(d.outlookEventId) + '_' + String(d.leadId);\n\n  const tzMap = {\n    'Pacific Standard Time': 'America/Los_Angeles',\n    'Pacific Daylight Time': 'America/Los_Angeles',\n    'Mountain Standard Time': 'America/Denver',\n    'Mountain Daylight Time': 'America/Denver',\n    'Central Standard Time': 'America/Chicago',\n    'Central Daylight Time': 'America/Chicago',\n    'Eastern Standard Time': 'America/New_York',\n    'Eastern Daylight Time': 'America/New_York',\n    'UTC': 'America/Los_Angeles'\n  };\n  const rawTz = String(d.startTimezone || '');\n  const meetingTz = tzMap[rawTz] || (rawTz.startsWith('America/') ? rawTz : 'America/Los_Angeles');\n\n  const meetingStart = new Date(d.startDateTime);\n  const reminder24h = new Date(meetingStart.getTime() - 24 * 60 * 60 * 1000);\n  const reminder1h  = new Date(meetingStart.getTime() -  1 * 60 * 60 * 1000);\n\n  const meetingSource = d.calendlyParsed ? 'Calendly' : 'Outlook';\n  const calendlyNote = d.calendlyParsed\n    ? 'Calendly invitee email parsed from Outlook event body.'\n    : '';\n\n  results.push({ json: {\n    meetingKey,\n    meetingTz,\n    meetingStartISO: meetingStart.toISOString(),\n    reminder24hISO: reminder24h.toISOString(),\n    reminder24hDate: reminder24h.toISOString().substring(0, 10),\n    reminder1hISO: reminder1h.toISOString(),\n    reminder1hDate: reminder1h.toISOString().substring(0, 10),\n    meetingSource,\n    calendlyNote,\n    calendlyParsed: d.calendlyParsed === true,\n    senderEmail: 'user@example.com',\n    colleagueEmail: 'colleague@example.com',\n    leadId: String(d.leadId || ''),\n    leadName: String(d.leadName || ''),\n    leadStatus: String(d.leadStatus || ''),\n    leadEmail: String(d.leadEmail || ''),\n    calendarSource: String(d.calendarSource || ''),\n    outlookEventId: String(d.outlookEventId || ''),\n    subject: String(d.subject || ''),\n    endDateTime: String(d.endDateTime || ''),\n    organizerEmail: String(d.organizerEmail || ''),\n    organizerName: String(d.organizerName || ''),\n    internalAttendees: String(d.internalAttendees || ''),\n    externalAttendeeEmails: String(d.externalAttendeeEmails || '')\n  }});\n}\nreturn results.length > 0 ? results : [{ json: { skip: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_013",
+      "name": "Calculate Meeting Key + Reminder Times",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4480,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_WORKFLOW_ID"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "dateTime": "={{ $json.reminder24hISO }}",
+            "timezone": "={{ $json.meetingTz }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "dateTime",
+              "displayName": "dateTime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "timezone",
+              "displayName": "timezone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "SAMPLE_NODE_ID_014",
+      "name": "Call W11 — Check 24h Reminder Date",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -4256,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "upsert",
+        "customObject": "Meeting_Reminder_Tracker__c",
+        "externalId": "Meeting_Key__c",
+        "externalIdValue": "={{ $json.meetingKey }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Meeting_Key__c",
+              "value": "={{ $json.meetingKey }}"
+            },
+            {
+              "fieldId": "Related_Lead__c",
+              "value": "={{ $json.leadId }}"
+            },
+            {
+              "fieldId": "Lead_Email__c",
+              "value": "={{ $json.leadEmail }}"
+            },
+            {
+              "fieldId": "Outlook_Event_ID__c",
+              "value": "={{ $json.outlookEventId }}"
+            },
+            {
+              "fieldId": "Outlook_Subject__c",
+              "value": "={{ $json.subject }}"
+            },
+            {
+              "fieldId": "Meeting_Start_Date_Time__c",
+              "value": "={{ $json.meetingStartISO }}"
+            },
+            {
+              "fieldId": "Meeting_End_Date_Time__c",
+              "value": "={{ $json.endDateTime }}"
+            },
+            {
+              "fieldId": "Meeting_Timezone__c",
+              "value": "={{ $json.meetingTz }}"
+            },
+            {
+              "fieldId": "Calendar_source__c",
+              "value": "={{ $json.calendarSource }}"
+            },
+            {
+              "fieldId": "Organizer_Email__c",
+              "value": "={{ $json.organizerEmail }}"
+            },
+            {
+              "fieldId": "Organizer_Name__c",
+              "value": "={{ $json.organizerName }}"
+            },
+            {
+              "fieldId": "Internal_Attendees__c",
+              "value": "={{ $json.internalAttendees }}"
+            },
+            {
+              "fieldId": "External_Attendees__c",
+              "value": "={{ $json.externalAttendeeEmails }}"
+            },
+            {
+              "fieldId": "Meeting_Source__c",
+              "value": "={{ $json.meetingSource || 'Outlook' }}"
+            },
+            {
+              "fieldId": "Meeting_Status__c",
+              "value": "Scheduled"
+            },
+            {
+              "fieldId": "Meeting_Number__c",
+              "value": "={{ $json.trueCount }}"
+            },
+            {
+              "fieldId": "Reminder_24h_Scheduled_Time__c",
+              "value": "={{ $json.reminder24hISO }}"
+            },
+            {
+              "fieldId": "Reminder_1h_Scheduled_Time__c",
+              "value": "={{ $json.reminder1hISO }}"
+            },
+            {
+              "fieldId": "Reminder_Status__c",
+              "value": "Not Scheduled"
+            },
+            {
+              "fieldId": "Review_Notes__c",
+              "value": "={{ $json.calendlyNote || '' }}"
+            },
+            {
+              "fieldId": "Last_Synced__c",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_015",
+      "name": "Upsert Meeting Reminder Tracker",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -2912,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "leadId": "={{ $json.leadId }}",
+        "updateFields": {
+          "customFieldsUi": {
+            "customFieldsValues": [
+              {
+                "fieldId": "Next_Meeting_Date__c",
+                "value": "={{ $json.meetingStartISO }}"
+              },
+              {
+                "fieldId": "Last_Meeting_Booked_Date__c",
+                "value": "={{ $now.toISO() }}"
+              },
+              {
+                "fieldId": "Last_Meaningful_Contact_Date__c",
+                "value": "={{ $now.toISO() }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "SAMPLE_NODE_ID_016",
+      "name": "Update Lead — Meeting Summary Fields",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -1120,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "status": "Not Started",
+        "additionalFields": {
+          "activityDate": "={{ $now.setZone('America/Los_Angeles').toFormat('yyyy-MM-dd') }}",
+          "description": "={{ 'Meeting booked via ' + $json.calendarSource + ' calendar.\\n\\nLead: ' + $json.leadName + '\\nMeeting Start: ' + $json.meetingStartISO + '\\nSubject: ' + $json.subject + '\\nMeeting #' + $json.trueCount + '\\nMeeting Key: ' + $json.meetingKey + '\\nOutlook Event ID: ' + $json.outlookEventId + '\\n\\nAction: Review whether Lead Stage should move to Appointment Booked.' }}",
+          "owner": "SAMPLE_RECORD_ID",
+          "priority": "High",
+          "subject": "Review: Meeting booked — consider moving Lead to Appointment Booked",
+          "whoId": "={{ $json.leadId }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_017",
+      "name": "Create Task — Review Lead Stage",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "status": "Not Started",
+        "additionalFields": {
+          "activityDate": "={{ $json.reminder24hDate }}",
+          "description": "={{ 'PHASE 1 \\u2014 TASK MODE\\n\\nLead: ' + $json.leadEmail + '\\nMeeting: ' + $json.subject + '\\nStart: ' + $json.meetingStartISO + '\\nCalendar: ' + $json.calendarSource + '\\nMeeting Key: ' + $json.meetingKey + '\\nOutlook Event ID: ' + $json.outlookEventId + ($json.holidayNote ? '\\n\\nHoliday note: ' + $json.holidayNote : '') }}",
+          "owner": "SAMPLE_RECORD_ID",
+          "priority": "High",
+          "subject": "={{ 'Send 24h meeting reminder — ' + $json.leadName }}",
+          "whoId": "={{ $json.leadId }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_018",
+      "name": "Create Task — 24h Reminder",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "status": "Not Started",
+        "additionalFields": {
+          "activityDate": "={{ $json.reminder1hDate }}",
+          "description": "={{ 'PHASE 1 \\u2014 TASK MODE\\n\\nLead: ' + $json.leadEmail + '\\nMeeting: ' + $json.subject + '\\nStart: ' + $json.meetingStartISO + '\\nCalendar: ' + $json.calendarSource + '\\nMeeting Key: ' + $json.meetingKey + '\\nOutlook Event ID: ' + $json.outlookEventId }}",
+          "owner": "SAMPLE_RECORD_ID",
+          "priority": "High",
+          "subject": "={{ 'Send 1h meeting reminder — ' + $json.leadName }}",
+          "whoId": "={{ $json.leadId }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_019",
+      "name": "Create Task — 1h Reminder",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "upsert",
+        "customObject": "Meeting_Reminder_Tracker__c",
+        "externalId": "Meeting_Key__c",
+        "externalIdValue": "={{ $json.meetingKey }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Meeting_Key__c",
+              "value": "={{ $json.meetingKey }}"
+            },
+            {
+              "fieldId": "X24_Hour_Reminder_Task_Created__c",
+              "value": "={{ $json.task24hExistsOrCreated ? 'true' : 'false' }}"
+            },
+            {
+              "fieldId": "X1_Hour_Reminder_Task_Created__c",
+              "value": "={{ $json.task1hExistsOrCreated ? 'true' : 'false' }}"
+            },
+            {
+              "fieldId": "Reminder_Status__c",
+              "value": "={{ $json.task24hExistsOrCreated && $json.task1hExistsOrCreated ? '1 Hour Task Created' : $json.task24hExistsOrCreated ? '24h Task Created' : 'Not Scheduled' }}"
+            },
+            {
+              "fieldId": "Last_Synced__c",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_020",
+      "name": "Update Tracker — Reminder Tasks Created",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Fetch + Normalize\nPolls Example User (account 1) and\nExample Representative (account 2) Outlook calendars.\nLookahead: 30 days.\nBoth normalized to same format\nthen merged into one stream.",
+        "height": 200,
+        "width": 300,
+        "color": 3
+      },
+      "id": "SAMPLE_NODE_ID_021",
+      "name": "Sticky Note 2f07b099",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -4896,
+        4992
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Filter + Classify\nSkips: cancelled, empty, test-filtered.\nClassifies: internal vs external.\nInternal domains in Config node.\nExpands: 1 item per external attendee.",
+        "height": 80,
+        "width": 892,
+        "color": 3
+      },
+      "id": "SAMPLE_NODE_ID_022",
+      "name": "Sticky Note 19251ecc",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -4352,
+        4960
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Lead Matching\nSOQL: Lead WHERE Email = attendeeEmail.\nExact email match guard: extracted email\nmust equal Lead.Email (trim + lowercase).\nNo match → skip silently (no alert task).\nLead found → continue downstream.",
+        "height": 80,
+        "width": 796,
+        "color": 3
+      },
+      "id": "SAMPLE_NODE_ID_023",
+      "name": "Sticky Note 99a4097c",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -3872,
+        5312
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Meeting Key + Upsert\nMeeting_Key__c = EventId_LeadId\nOutlook_Event_ID__c = raw only.\nUpserts Meeting_Reminder_Tracker__c.\nCalculates reminder times.\nUpdates Lead summary fields.",
+        "height": 200,
+        "width": 300,
+        "color": 4
+      },
+      "id": "SAMPLE_NODE_ID_024",
+      "name": "Sticky Note aa116993",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2960,
+        4992
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## W7: Meeting Booked Detection\n✅ [STATUS REDACTED — configure after import]\nPolls every 30 min\n\nDuplicate paths fixed ✅\nClean path:\nApply W11 → Pre-Check Tracker Exists → Normalize Pre-Check\n→ Pre-Count Tracker Records → Resolve Meeting Number\n→ Upsert Tracker → Resolve True Meeting Count\n→ Check SF Event Exists Raw → Check + Route SF Event\n→ Event Already Exists? → Lead update\n→ Check 24h Task Exists (SOQL) → Needs 24h Task?\n→ Check 1h Task Exists (SOQL) → Needs 1h Task?\n→ Merge Task Context → Update Tracker Flags\n\nReview task: SOQL by Lead + meetingKey in description.\n24h/1h tasks: SOQL by Lead + meetingKey + subject prefix.\nTracker upsert: Meeting_Key__c external ID (must be unique in SF).\nCalendly body parsing ✅ | No hardcoded IDs ✅",
+        "height": 280,
+        "width": 300,
+        "color": 5
+      },
+      "id": "SAMPLE_NODE_ID_025",
+      "name": "Sticky Note 5416503a",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -5408,
+        4928
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Receives all items from Call W11 (one per lead that passed through).\n// W11 runs once (for the first item's reminder date due to Execute Workflow limitations).\n// We apply the same W11 result to all items, or fall back gracefully.\nconst calcItems = $('Calculate Meeting Key + Reminder Times').all();\nconst results = [];\nlet w11Result = null;\ntry {\n  const w11Items = $input.all();\n  if (w11Items && w11Items.length > 0) w11Result = w11Items[0].json;\n} catch(e) {}\n\nfor (const calcItem of calcItems) {\n  const calc = calcItem.json;\n  if (calc.skip) continue;\n  let reminder24hDate = String(calc.reminder24hDate || '');\n  let holidayNote = '';\n  try {\n    if (w11Result && w11Result.isBusinessDay === false) {\n      reminder24hDate = String(w11Result.previousBusinessDay || reminder24hDate);\n      holidayNote = 'Original 24h reminder (' + calc.reminder24hDate + ') was ' + w11Result.reason + '. Moved to: ' + reminder24hDate;\n    }\n  } catch(e) {\n    holidayNote = 'W11 check skipped';\n  }\n  results.push({ json: { ...calc, reminder24hDate, holidayNote } });\n}\nreturn results.length > 0 ? results : [{ json: { skip: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_026",
+      "name": "Apply W11 — Update 24h Date If Needed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4032,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "nr",
+              "leftValue": "={{ $json.isNewRecord }}",
+              "operator": {
+                "operation": "true",
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_027",
+      "name": "New Record? — Lead + Review Task Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1344,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "t24",
+              "leftValue": "={{ $json.needs24hTask }}",
+              "operator": {
+                "operation": "true",
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_028",
+      "name": "Needs 24h Task?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -224,
+        480
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_029",
+      "name": "Skip 24h Task — Already Created",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "t1h",
+              "leftValue": "={{ $json.needs1hTask }}",
+              "operator": {
+                "operation": "true",
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_030",
+      "name": "Needs 1h Task?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        896,
+        480
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_031",
+      "name": "Skip 1h Task — Already Created",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "customObject": "Event",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Subject",
+              "value": "={{ $json.subject }}"
+            },
+            {
+              "fieldId": "StartDateTime",
+              "value": "={{ $json.meetingStartISO }}"
+            },
+            {
+              "fieldId": "EndDateTime",
+              "value": "={{ $json.endDateTime }}"
+            },
+            {
+              "fieldId": "WhoId",
+              "value": "={{ $json.leadId }}"
+            },
+            {
+              "fieldId": "OwnerId",
+              "value": "={{ ($json.internalAttendees && $json.internalAttendees.toLowerCase().includes('user@example.com')) || ($json.organizerEmail && $json.organizerEmail.toLowerCase().includes('user@example.com')) || $json.calendarSource === 'Primary' ? 'SAMPLE_RECORD_ID' : 'SAMPLE_RECORD_ID' }}"
+            },
+            {
+              "fieldId": "Description",
+              "value": "={{ 'W7 Meeting Booked Detection\\n\\nCalendar Source: ' + $json.calendarSource + '\\nOrganizer: ' + $json.organizerEmail + '\\nInternal Attendees: ' + $json.internalAttendees + '\\nExternal Attendees: ' + $json.externalAttendeeEmails + '\\nMeeting Key: ' + $json.meetingKey + '\\nOutlook Event ID: ' + $json.outlookEventId }}"
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_032",
+      "name": "Upsert Salesforce Event",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -1792,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "leadId": "={{ $json.leadId }}",
+        "updateFields": {
+          "customFieldsUi": {
+            "customFieldsValues": [
+              {
+                "fieldId": "Next_Meeting_Date__c",
+                "value": "={{ $json.meetingStartISO }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "SAMPLE_NODE_ID_033",
+      "name": "Update Lead — Sync Next Meeting Date",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -1120,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nfor (const item of $('Resolve Meeting Number').all()) {\n  if (item.json.skip) continue;\n  results.push({ json: { ...item.json } });\n}\nreturn results.length > 0 ? results : [{ json: { skip: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_034",
+      "name": "Resolve True Meeting Count",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2688,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ (function() {\n  const items = $('Normalize Pre-Check').all().filter(i => !i.json.skip);\n  if (!items.length) return \"SELECT COUNT(Id) total FROM Meeting_Reminder_Tracker__c WHERE Meeting_Status__c != 'Cancelled' AND Id = null\";\n  const leadIds = [...new Set(items.map(i => \"'\" + i.json.leadId + \"'\"))].join(',');\n  const meetingKeys = items.map(i => \"'\" + i.json.meetingKey + \"'\").join(',');\n  return \"SELECT Related_Lead__c, COUNT(Id) total FROM Meeting_Reminder_Tracker__c WHERE Related_Lead__c IN (\" + leadIds + \") AND Meeting_Status__c != 'Cancelled' AND Meeting_Key__c NOT IN (\" + meetingKeys + \") GROUP BY Related_Lead__c\";\n})() }}"
+      },
+      "id": "SAMPLE_NODE_ID_035",
+      "name": "Pre-Count Tracker Records",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -3360,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Guaranteed path: always receives input from Normalize Pre-Check.\n// Reads Pre-Count output via node reference to get counts per Lead.\nconst preCheckItems = $('Normalize Pre-Check').all();\n\n// Build count lookup: leadId -> count of OTHER non-cancelled meetings\nconst countByLead = {};\ntry {\n  for (const c of $('Pre-Count Tracker Records').all()) {\n    if (c.json && c.json.Related_Lead__c) {\n      countByLead[String(c.json.Related_Lead__c)] = Number(c.json.total || c.json.expr0 || 0);\n    }\n  }\n} catch(e) {}\n\nconst results = [];\nfor (const preCheck of preCheckItems) {\n  const calc = preCheck.json;\n  if (calc.skip) continue;\n  const otherCount = countByLead[calc.leadId] || 0;\n  const trueCount = otherCount + 1;\n  results.push({ json: { ...calc, trueCount, meetingNumberResolved: trueCount } });\n}\nreturn results.length > 0 ? results : [{ json: { skip: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_036",
+      "name": "Resolve Meeting Number",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3136,
+        288
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_037",
+      "name": "Skip SF Event — Already Exists",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -1792,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Receives Apply W11 output (all items) and Pre-Check tracker results.\n// Matches each item to its tracker by meetingKey.\nconst w11Items = $('Apply W11 \\u2014 Update 24h Date If Needed').all();\n\n// Build tracker lookup: meetingKey -> tracker record\nconst trackerByKey = {};\ntry {\n  for (const t of $('Pre-Check Tracker Exists').all()) {\n    if (t.json && t.json.Meeting_Key__c) {\n      trackerByKey[String(t.json.Meeting_Key__c)] = t.json;\n    }\n  }\n} catch(e) {}\n\nconst results = [];\nfor (const w11Item of w11Items) {\n  const calc = w11Item.json;\n  if (calc.skip) continue;\n\n  let isNewRecord = true;\n  let needs24hTask = true;\n  let needs1hTask = true;\n\n  const rec = trackerByKey[calc.meetingKey];\n  if (rec && rec.Id) {\n    isNewRecord = false;\n    needs24hTask = rec.X24_Hour_Reminder_Task_Created__c !== true;\n    needs1hTask  = rec.X1_Hour_Reminder_Task_Created__c  !== true;\n  }\n\n  results.push({ json: { isNewRecord, needs24hTask, needs1hTask, ...calc } });\n}\nreturn results.length > 0 ? results : [{ json: { skip: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_038",
+      "name": "Normalize Pre-Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3584,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ (function() {\n  const items = $('Calculate Meeting Key + Reminder Times').all().filter(i => !i.json.skip);\n  const keys = items.map(i => \"'\" + i.json.meetingKey + \"'\").join(',');\n  return \"SELECT Id, Meeting_Key__c, X24_Hour_Reminder_Task_Created__c, X1_Hour_Reminder_Task_Created__c FROM Meeting_Reminder_Tracker__c WHERE Meeting_Key__c IN (\" + keys + \") LIMIT \" + items.length;\n})() }}"
+      },
+      "id": "SAMPLE_NODE_ID_039",
+      "name": "Pre-Check Tracker Exists",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -3808,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Receives all items from Resolve True Meeting Count.\n// Reads Check SF Event Exists Raw results and matches by WhoId+StartDateTime.\nconst ctxItems = $('Resolve True Meeting Count').all();\n\n// Build event lookup: leadId+'|'+startISO -> eventId\nconst eventByKey = {};\ntry {\n  for (const ev of $('Check SF Event Exists Raw').all()) {\n    if (ev.json && ev.json.Id && ev.json.WhoId) {\n      // StartDateTime from SF comes back as ISO, normalize\n      const start = String(ev.json.StartDateTime || '').replace(/\\.000\\+0000$/, 'Z');\n      const key = String(ev.json.WhoId) + '|' + start;\n      eventByKey[key] = String(ev.json.Id);\n    }\n  }\n} catch(e) {}\n\nconst results = [];\nfor (const ctxItem of ctxItems) {\n  const ctx = ctxItem.json;\n  if (ctx.skip) continue;\n  // Try to match: normalize meetingStartISO\n  const normStart = String(ctx.meetingStartISO || '').replace(/\\.000Z$/, 'Z');\n  const lookupKey = String(ctx.leadId) + '|' + normStart;\n  const eventId = eventByKey[lookupKey] || null;\n  const eventExists = !!eventId;\n  results.push({ json: { ...ctx, eventExists, eventId } });\n}\nreturn results.length > 0 ? results : [{ json: { skip: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_040",
+      "name": "Check + Route SF Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2240,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ (function() {\n  const items = $('Resolve True Meeting Count').all().filter(i => !i.json.skip);\n  if (!items.length) return \"SELECT Id, WhoId, StartDateTime FROM Event WHERE Id = null LIMIT 1\";\n  const conditions = items.map(i => \n    \"(WhoId = '\" + i.json.leadId + \"' AND StartDateTime = \" + i.json.meetingStartISO + \")\"\n  ).join(' OR ');\n  return \"SELECT Id, WhoId, StartDateTime FROM Event WHERE \" + conditions + \" LIMIT \" + (items.length + 5);\n})() }}"
+      },
+      "id": "SAMPLE_NODE_ID_041",
+      "name": "Check SF Event Exists Raw",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -2464,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "ev",
+              "leftValue": "={{ $json.eventExists }}",
+              "operator": {
+                "operation": "true",
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_042",
+      "name": "Event Already Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2016,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// After event creation/skip, recover full context from Check + Route SF Event.\n// The event create node only returns {id, success, errors} — we need the full Lead context.\n// Check + Route SF Event has the full batch; match by position.\nconst ctxItems = $('Check + Route SF Event').all();\nconst results = [];\nfor (const ctx of ctxItems) {\n  if (ctx.json.skip) continue;\n  results.push({ json: { ...ctx.json } });\n}\nreturn results.length > 0 ? results : [{ json: { skip: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_043",
+      "name": "Merge Event Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1568,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sequential: receives input from Recover Context After 1h Task.\n// At this point, both 24h AND 1h task branches have fully completed.\n// Read task flags from both Recover Context nodes keyed by meetingKey.\nconst items24h = $('Recover Context After 24h Check').all();\nconst items1h  = $('Recover Context After 1h Task').all();\n\n// Build lookup: meetingKey -> flags\nconst flagBy24h = {};\nfor (const item of items24h) {\n  if (item.json && item.json.meetingKey) {\n    flagBy24h[item.json.meetingKey] = item.json;\n  }\n}\nconst flagBy1h = {};\nfor (const item of items1h) {\n  if (item.json && item.json.meetingKey) {\n    flagBy1h[item.json.meetingKey] = item.json;\n  }\n}\n\nconst results = [];\nfor (const item of $input.all()) {\n  const ctx = item.json;\n  if (!ctx || ctx.skip) continue;\n  const mk = ctx.meetingKey;\n  const f24 = flagBy24h[mk] || {};\n  const f1h = flagBy1h[mk]  || {};\n  // task24hExistsOrCreated: soqlExists OR (needs24hTask was true = Create branch ran)\n  const task24hExistsOrCreated = f24.soql24hExists === true || f24.needs24hTask === true;\n  // task1hExistsOrCreated: from Recover Context After 1h Task which computed it\n  const task1hExistsOrCreated  = f1h.task1hExistsOrCreated === true;\n  results.push({ json: {\n    ...ctx,\n    soql24hExists: f24.soql24hExists || false,\n    soql1hExists:  f1h.soql1hExists  || false,\n    task24hExistsOrCreated,\n    task1hExistsOrCreated\n  }});\n}\nreturn results.length > 0 ? results : [{ json: { skip: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_044",
+      "name": "Merge Task Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// After Lead update nodes (which return success/error), recover full Lead context.\n// Read from Merge Event Result which has the full context for all leads.\nconst ctxItems = $('Merge Event Result').all();\nconst results = [];\nfor (const ctx of ctxItems) {\n  if (ctx.json.skip) continue;\n  results.push({ json: { ...ctx.json } });\n}\nreturn results.length > 0 ? results : [{ json: { skip: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_045",
+      "name": "Recover Context After Lead Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ \"SELECT Id, WhoId, Subject, Description FROM Task WHERE WhoId = '\" + $json.leadId + \"' AND Subject = 'Review: Meeting booked \\u2014 consider moving Lead to Appointment Booked' ORDER BY CreatedDate DESC LIMIT 50\" }}"
+      },
+      "id": "SAMPLE_NODE_ID_046",
+      "name": "Check Review Task Exists",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -672,
+        96
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_047",
+      "name": "Skip Review Task",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "rt",
+              "leftValue": "={{ $json.reviewTaskExists }}",
+              "operator": {
+                "operation": "true",
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_048",
+      "name": "Review Task Already Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -224,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Batch-safe: process ALL items from Recover Context After Lead Update.\n// Reads Check Review Task Exists SOQL results and matches by meetingKey in Description.\n// No Description LIKE in SOQL — we filter in code instead.\n//\n// GUARD 1: If the Lead already has >= 1 Meeting Reminder Tracker record\n// (i.e. this is NOT their first meeting), skip the review task entirely.\n//\n// GUARD 2: If the Lead status is already in a booked/completed/follow-up state,\n// skip the review task regardless of tracker count.\nconst ctxItems = $('Recover Context After Lead Update').all();\nconst soqlItems = $('Check Review Task Exists').all();\n\n// Statuses that indicate the Lead is already past the point where the review task is useful.\n// Case-insensitive match applied below.\nconst SKIP_STATUSES = [\n  'appointment booked',\n  'app booked',\n  'discovery completed',\n  'follow-up meeting',\n  'follow up meeting'\n];\n\n// Build count lookup: leadId -> count of OTHER non-cancelled tracker records\nconst trackerCountByLead = {};\ntry {\n  for (const c of $('Pre-Count Tracker Records').all()) {\n    if (c.json && c.json.Related_Lead__c) {\n      trackerCountByLead[String(c.json.Related_Lead__c)] = Number(c.json.total || c.json.expr0 || 0);\n    }\n  }\n} catch(e) {}\n\n// Build set of task descriptions returned for this lead\nconst taskDescriptions = soqlItems\n  .map(si => String(si.json && si.json.Description ? si.json.Description : ''))\n  .filter(d => d.length > 0);\n\nconst results = [];\nfor (const ctxItem of ctxItems) {\n  const ctx = ctxItem.json;\n  if (!ctx || ctx.skip) continue;\n\n  // GUARD 1: tracker count >= 1 → skip\n  const otherTrackerCount = trackerCountByLead[ctx.leadId] || 0;\n  if (otherTrackerCount >= 1) {\n    results.push({ json: { ...ctx, reviewTaskExists: true, reviewTaskSkipReason: 'tracker_count_' + otherTrackerCount } });\n    continue;\n  }\n\n  // GUARD 2: Lead status already booked/completed/follow-up → skip\n  const statusNorm = String(ctx.leadStatus || '').toLowerCase().trim();\n  if (SKIP_STATUSES.includes(statusNorm)) {\n    results.push({ json: { ...ctx, reviewTaskExists: true, reviewTaskSkipReason: 'lead_status_' + statusNorm } });\n    continue;\n  }\n\n  // Original logic: task exists only if one of the returned tasks has meetingKey in its Description\n  const reviewTaskExists = taskDescriptions.some(d => d.includes(ctx.meetingKey));\n  results.push({ json: { ...ctx, reviewTaskExists } });\n}\nreturn results.length > 0 ? results : [{ json: { skip: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_049",
+      "name": "Recover Review Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            },
+            {}
+          ]
+        }
+      },
+      "id": "SAMPLE_NODE_ID_050",
+      "name": "Poll Calendars Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -6720,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ \"SELECT Id, WhoId, Subject, Description FROM Task WHERE WhoId = '\" + $json.leadId + \"' AND Subject LIKE 'Send 24h meeting reminder%' ORDER BY CreatedDate DESC LIMIT 50\" }}"
+      },
+      "id": "SAMPLE_NODE_ID_051",
+      "name": "Check 24h Task Exists",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -672,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Batch-safe: keyed by meetingKey matched in Description.\n// SOQL no longer filters Description — we do it here in code.\n// Returns all 24h reminder tasks for this lead; we check if any has meetingKey in Description.\nconst ctxItems = $('Recover Context After Lead Update').all();\n\n// Build set: WhoId -> [descriptions] from Check 24h Task Exists results\nconst descsByLead = {};\ntry {\n  for (const si of $('Check 24h Task Exists').all()) {\n    const whoId = String(si.json && si.json.WhoId ? si.json.WhoId : '');\n    const desc  = String(si.json && si.json.Description ? si.json.Description : '');\n    if (whoId) {\n      if (!descsByLead[whoId]) descsByLead[whoId] = [];\n      descsByLead[whoId].push(desc);\n    }\n  }\n} catch(e) {}\n\nconst results = [];\nfor (const ctxItem of ctxItems) {\n  const ctx = ctxItem.json;\n  if (!ctx || ctx.skip) continue;\n  // Task exists only if a returned task's Description contains this lead's meetingKey\n  const descs = descsByLead[ctx.leadId] || [];\n  const soqlExists = descs.some(d => d.includes(ctx.meetingKey));\n  const needs24hTask = !soqlExists;\n  results.push({ json: { ...ctx, needs24hTask, soql24hExists: soqlExists, task24hExistsOrCreated: soqlExists } });\n}\nreturn results.length > 0 ? results : [{ json: { skip: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_052",
+      "name": "Recover Context After 24h Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ \"SELECT Id, WhoId, Subject, Description FROM Task WHERE WhoId = '\" + $json.leadId + \"' AND Subject LIKE 'Send 1h meeting reminder%' ORDER BY CreatedDate DESC LIMIT 50\" }}"
+      },
+      "id": "SAMPLE_NODE_ID_053",
+      "name": "Check 1h Task Exists",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Batch-safe: keyed by meetingKey matched in Description.\n// SOQL no longer filters Description — we do it here in code.\nconst ctxItems = $('Recover Context After Lead Update').all();\n\nconst descsByLead = {};\ntry {\n  for (const si of $('Check 1h Task Exists').all()) {\n    const whoId = String(si.json && si.json.WhoId ? si.json.WhoId : '');\n    const desc  = String(si.json && si.json.Description ? si.json.Description : '');\n    if (whoId) {\n      if (!descsByLead[whoId]) descsByLead[whoId] = [];\n      descsByLead[whoId].push(desc);\n    }\n  }\n} catch(e) {}\n\nconst results = [];\nfor (const ctxItem of ctxItems) {\n  const ctx = ctxItem.json;\n  if (!ctx || ctx.skip) continue;\n  const descs = descsByLead[ctx.leadId] || [];\n  const soqlExists = descs.some(d => d.includes(ctx.meetingKey));\n  const needs1hTask = !soqlExists;\n  results.push({ json: { ...ctx, needs1hTask, soql1hExists: soqlExists, task1hExistsOrCreated: soqlExists } });\n}\nreturn results.length > 0 ? results : [{ json: { skip: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_054",
+      "name": "Recover Context After 1h Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sequential gate: fires only after the 1h task create OR skip branch completes.\n// Restores full meeting context from Recover Context After 1h Check (which has all ctx).\n// $input has one item from Create Task — 1h Reminder {id, success} or from Skip 1h Task.\n// We read full context from the upstream 1h check node instead.\nconst ctxItems = $('Recover Context After 1h Check').all();\nconst results = [];\nfor (const ctxItem of ctxItems) {\n  const ctx = ctxItem.json;\n  if (!ctx || ctx.skip) continue;\n  // task1hExistsOrCreated:\n  // - soqlExists=true → task already existed → true\n  // - needs1hTask=false → task was skipped (shouldn't happen if soql=false, but safe) → false\n  // - needs1hTask=true → Create Task branch ran → true\n  const task1hExistsOrCreated = ctx.soql1hExists === true || ctx.needs1hTask === true;\n  results.push({ json: { ...ctx, task1hExistsOrCreated } });\n}\nreturn results.length > 0 ? results : [{ json: { skip: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_055",
+      "name": "Recover Context After 1h Task",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sequential gate: fires only after the 24h task create OR skip branch completes.\n// Restores full context from Recover Context After 24h Check.\nconst ctxItems = $('Recover Context After 24h Check').all();\nconst results = [];\nfor (const ctxItem of ctxItems) {\n  const ctx = ctxItem.json;\n  if (!ctx || ctx.skip) continue;\n  // task24hExistsOrCreated:\n  // soqlExists=true → already existed\n  // needs24hTask=true → Create branch ran → task created\n  const task24hExistsOrCreated = ctx.soql24hExists === true || ctx.needs24hTask === true;\n  results.push({ json: { ...ctx, task24hExistsOrCreated } });\n}\nreturn results.length > 0 ? results : [{ json: { skip: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_056",
+      "name": "Recover Context After 24h Task",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        480
+      ]
+    }
+  ],
+  "connections": {
+    "Meeting Detection Config": {
+      "main": [
+        [
+          {
+            "node": "Fetch Example User's Calendar Events",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Example Representative's Calendar Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run W7 Manually (Test)": {
+      "main": [
+        [
+          {
+            "node": "Meeting Detection Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Example User's Calendar Events": {
+      "main": [
+        [
+          {
+            "node": "Normalize Example User's Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Example User's Events": {
+      "main": [
+        [
+          {
+            "node": "Merge Both Calendars",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Both Calendars": {
+      "main": [
+        [
+          {
+            "node": "Filter Events + Classify Attendees",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Example Representative's Calendar Events": {
+      "main": [
+        [
+          {
+            "node": "Normalize Example Representative's Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Example Representative's Events": {
+      "main": [
+        [
+          {
+            "node": "Merge Both Calendars",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Expand — One Item Per External Attendee": {
+      "main": [
+        [
+          {
+            "node": "Match Attendee Email to Salesforce Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match Attendee Email to Salesforce Lead": {
+      "main": [
+        [
+          {
+            "node": "Normalize Lead Match Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Lead Match Result": {
+      "main": [
+        [
+          {
+            "node": "Lead Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Found?": {
+      "main": [
+        [
+          {
+            "node": "Calculate Meeting Key + Reminder Times",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs 24h Task?": {
+      "main": [
+        [
+          {
+            "node": "Create Task — 24h Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip 24h Task — Already Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs 1h Task?": {
+      "main": [
+        [
+          {
+            "node": "Create Task — 1h Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip 1h Task — Already Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Record? — Lead + Review Task Gate": {
+      "main": [
+        [
+          {
+            "node": "Update Lead — Meeting Summary Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Lead — Sync Next Meeting Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Events + Classify Attendees": {
+      "main": [
+        [
+          {
+            "node": "Expand — One Item Per External Attendee",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pre-Count Tracker Records": {
+      "main": [
+        [
+          {
+            "node": "Resolve Meeting Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Meeting Number": {
+      "main": [
+        [
+          {
+            "node": "Upsert Meeting Reminder Tracker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Pre-Check": {
+      "main": [
+        [
+          {
+            "node": "Pre-Count Tracker Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Meeting Reminder Tracker": {
+      "main": [
+        [
+          {
+            "node": "Resolve True Meeting Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply W11 — Update 24h Date If Needed": {
+      "main": [
+        [
+          {
+            "node": "Pre-Check Tracker Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Meeting Key + Reminder Times": {
+      "main": [
+        [
+          {
+            "node": "Call W11 — Check 24h Reminder Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call W11 — Check 24h Reminder Date": {
+      "main": [
+        [
+          {
+            "node": "Apply W11 — Update 24h Date If Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve True Meeting Count": {
+      "main": [
+        [
+          {
+            "node": "Check SF Event Exists Raw",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check + Route SF Event": {
+      "main": [
+        [
+          {
+            "node": "Event Already Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event Already Exists?": {
+      "main": [
+        [
+          {
+            "node": "Skip SF Event — Already Exists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Upsert Salesforce Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip SF Event — Already Exists": {
+      "main": [
+        [
+          {
+            "node": "Merge Event Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Salesforce Event": {
+      "main": [
+        [
+          {
+            "node": "Merge Event Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Event Result": {
+      "main": [
+        [
+          {
+            "node": "New Record? — Lead + Review Task Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Task Context": {
+      "main": [
+        [
+          {
+            "node": "Update Tracker — Reminder Tasks Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead — Meeting Summary Fields": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After Lead Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead — Sync Next Meeting Date": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After Lead Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context After Lead Update": {
+      "main": [
+        [
+          {
+            "node": "Check Review Task Exists",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check 24h Task Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Review Task Exists": {
+      "main": [
+        [
+          {
+            "node": "Recover Review Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Review Context": {
+      "main": [
+        [
+          {
+            "node": "Review Task Already Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Review Task Already Exists?": {
+      "main": [
+        [
+          {
+            "node": "Skip Review Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Task — Review Lead Stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Calendars Every 30 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Meeting Detection Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 24h Task Exists": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After 24h Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context After 24h Check": {
+      "main": [
+        [
+          {
+            "node": "Needs 24h Task?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 1h Task Exists": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After 1h Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context After 1h Check": {
+      "main": [
+        [
+          {
+            "node": "Needs 1h Task?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pre-Check Tracker Exists": {
+      "main": [
+        [
+          {
+            "node": "Normalize Pre-Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check SF Event Exists Raw": {
+      "main": [
+        [
+          {
+            "node": "Check + Route SF Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Task — 1h Reminder": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After 1h Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip 1h Task — Already Created": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After 1h Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context After 1h Task": {
+      "main": [
+        [
+          {
+            "node": "Merge Task Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Task — 24h Reminder": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After 24h Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip 24h Task — Already Created": {
+      "main": [
+        [
+          {
+            "node": "Recover Context After 24h Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Context After 24h Task": {
+      "main": [
+        [
+          {
+            "node": "Check 1h Task Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "nodeGroups": [],
+  "tags": []
+}

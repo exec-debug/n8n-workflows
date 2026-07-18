@@ -1,0 +1,1770 @@
+{
+  "name": "Document Intake and Case Processing",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $('Normalize SharePoint Upload Payload').item.json }];"
+      },
+      "id": "SAMPLE_NODE_ID_001",
+      "name": "Restore Upload Payload for Download",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7280,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://graph.microsoft.com/v1.0/sites/' + ($json.siteId || 'SAMPLE_CHANNEL_ID') + '/drive/root:/SAMPLE_AUTOMATION/' + encodeURIComponent($json.fileName) + ':/content' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "SAMPLE_NODE_ID_002",
+      "name": "Download PDF from SharePoint",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -7056,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.pdf.co/v1/file/upload/get-presigned-url",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $('Normalize SharePoint Upload Payload').item.json.fileName || 'sample-document.pdf' }}"
+            },
+            {
+              "name": "contenttype",
+              "value": "application/pdf"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "REPLACE_WITH_ENVIRONMENT_VARIABLE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_003",
+      "name": "PDF.co Get Upload URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -6832,
+        1040
+      ],
+      "notes": "SECURITY NOTE: x-api-key is hardcoded in headers. Move to n8n credentials or environment variables when possible."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_004",
+      "name": "Merge Upload URL With Binary",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -6608,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $json.presignedUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/pdf"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_005",
+      "name": "PDF.co Upload PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -6384,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const normalized = $('Normalize SharePoint Upload Payload').item.json;\nconst uploadMeta = $('PDF.co Get Upload URL').item.json;\n\nreturn [{\n  json: {\n    uploaded_pdf_url: uploadMeta.url,\n    source_file_name: normalized.fileName || 'sample-document.pdf',\n    source_sharepoint_file_id: normalized.sharepointIdentifier || normalized.fileId || null,\n    presignedUrl: uploadMeta.presignedUrl,\n    url: uploadMeta.url\n  }\n}];"
+      },
+      "id": "SAMPLE_NODE_ID_006",
+      "name": "Set PDF.co Uploaded URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6160,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.pdf.co/v1/pdf/convert/to/text",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "REPLACE_WITH_ENVIRONMENT_VARIABLE"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { url: $json.uploaded_pdf_url, inline: false, async: true, lang: \"eng\", pages: \"0-\", profiles: JSON.stringify({ OCRMode: \"Auto\", OCRResolution: 300 }) } }}",
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_007",
+      "name": "PDF.co OCR PDF to Text",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -5936,
+        672
+      ],
+      "notes": "SECURITY NOTE: x-api-key is hardcoded in headers. Move to n8n credentials or environment variables when possible."
+    },
+    {
+      "parameters": {
+        "amount": 90
+      },
+      "id": "SAMPLE_NODE_ID_008",
+      "name": "Wait for PDF.co OCR Job",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -5712,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.pdf.co/v1/job/check",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "jobid",
+              "value": "={{ $('PDF.co OCR PDF to Text').item.json.jobId }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "REPLACE_WITH_ENVIRONMENT_VARIABLE"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "SAMPLE_NODE_ID_009",
+      "name": "PDF.co Check OCR Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -5488,
+        672
+      ],
+      "notes": "SECURITY NOTE: x-api-key is hardcoded in headers. Move to n8n credentials or environment variables when possible."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ocr-pdfco-is-success",
+              "leftValue": "={{ $json.pdfco_is_success === true || String($json.pdfco_is_success).toLowerCase() === 'true' }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": true
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_010",
+      "name": "OCR Result Is URL",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -5040,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Normalize PDF.co OCR Job Status').item.json.pdfco_result_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "SAMPLE_NODE_ID_011",
+      "name": "PDF.co Download OCR Text",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -4816,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ocrItem = $input.item.json;\nconst prev = $('Set PDF.co Uploaded URL').item.json;\n\nfunction pickText(payload) {\n  if (!payload) return '';\n  if (typeof payload === 'string') return payload;\n  const candidates = [payload.body, payload.text, payload.result, payload.data];\n  for (const c of candidates) {\n    if (typeof c === 'string' && c.trim()) return c;\n  }\n  return '';\n}\n\nlet extractedText = pickText(ocrItem);\nif (!extractedText && typeof ocrItem === 'string') extractedText = ocrItem;\n\nreturn [{\n  json: {\n    ...prev,\n    text: extractedText,\n    raw_text: extractedText\n  }\n}];"
+      },
+      "id": "SAMPLE_NODE_ID_012",
+      "name": "Normalize PDF.co OCR Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4592,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// DOCUMENT_SYSTEM Structured Parser v4.4 — OCR-layout-aware (structured-v4.4-DOCUMENT_FORM-ocr)\n// parser_version: structured-v4.4-DOCUMENT_FORM-ocr\n\nfunction normalizeDate(s) {\n  if (!s) return null;\n  const t = String(s).trim();\n  const slash = t.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);\n  if (slash) {\n    return `${slash[3]}-${slash[1].padStart(2, '0')}-${slash[2].padStart(2, '0')}`;\n  }\n  const compact = t.replace(/\\D/g, '');\n  if (compact.length === 8) {\n    const mm = compact.slice(0, 2);\n    const dd = compact.slice(2, 4);\n    const yyyy = compact.slice(4);\n    const m = Number(mm);\n    const d = Number(dd);\n    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {\n      return `${yyyy}-${mm}-${dd}`;\n    }\n  }\n  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(t)) return t;\n  return null;\n}\n\nfunction normalizeDateTime(s) {\n  if (!s) return null;\n  const t = String(s).trim();\n  const m = t.match(/(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})(?:\\s+(\\d{1,2}):(\\d{2})(?::(\\d{2}))?)?/);\n  if (!m) return normalizeDate(t);\n  const date = `${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;\n  if (m[4] != null) {\n    const hh = m[4].padStart(2, '0');\n    const mm = m[5].padStart(2, '0');\n    const ss = (m[6] || '00').padStart(2, '0');\n    return `${date}T${hh}:${mm}:${ss}`;\n  }\n  return date;\n}\n\nfunction cleanAccountNumber(value) {\n  if (!value) return null;\n  let v = String(value).toUpperCase();\n  v = v.replace(/[\\[\\]|{}()]/g, '');\n  v = v.replace(/[^A-Z0-9#-]/g, '');\n  v = v.replace(/^C#GGORMANUSA/, 'CGGORMANUSA');\n  v = v.replace(/^C#GORMANUSA/, 'CGGORMANUSA');\n  v = v.replace(/^C#GG/, 'CGG');\n  v = v.replace(/^C#G/, 'CG');\n  v = v.replace(/^C#/, 'C');\n  v = v.replace(/#/g, '');\n  v = v.replace(/^COGORMANUSA/, 'CGGORMANUSA');\n  v = v.replace(/^C0GORMANUSA/, 'CGGORMANUSA');\n  v = v.replace(/^CG0RMANUSA/, 'CGGORMANUSA');\n  v = v.replace(/^CGORMANUSA/, 'CGGORMANUSA');\n  v = v.replace(/^CGGORMANUSAS(?=\\d)/, 'CGGORMANUSA5');\n  v = v.replace(/^CGGORMANUSAO(?=\\d)/, 'CGGORMANUSA0');\n  v = v.replace(/^CGGORMANUSAI(?=\\d)/, 'CGGORMANUSA1');\n  v = v.replace(/^CGGORMANUSAL(?=\\d)/, 'CGGORMANUSA1');\n  if (/^CGG?ORMAN|^CGROSANO|^CRPM/i.test(v) && !v.startsWith('CG')) {\n    v = 'C' + v;\n  }\n  if (v.length < 5) return null;\n  return v;\n}\n\nfunction cleanCode(value) {\n  if (!value) return null;\n  const v = String(value).trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');\n  return v || null;\n}\n\nfunction cleanMoney(value) {\n  if (value == null || value === '') return null;\n  const v = String(value).replace(/[$,\\s]/g, '').trim();\n  if (!/^\\d+(\\.\\d+)?$/.test(v)) return null;\n  return v.includes('.') ? String(Number(v)) : v;\n}\n\nfunction parseCompactDob(digits) {\n  const d = String(digits || '').replace(/\\D/g, '');\n  if (d.length === 8) return normalizeDate(d);\n  if ((d.length === 9 || d.length === 10) && d.startsWith('11')) {\n    const mm = d.slice(0, 2);\n    const dd = d.slice(3, 5);\n    const yyyy = d.slice(6, 10);\n    return normalizeDate(`${mm}/${dd}/${yyyy}`);\n  }\n  if (d.length === 9 && d.startsWith('1')) return normalizeDate(d.slice(1));\n  return null;\n}\n\nfunction cleanPhone(value) {\n  if (!value) return null;\n  const digits = String(value).replace(/\\D/g, '');\n  return digits.length >= 10 ? digits : null;\n}\n\nconst LABEL_JUNK_EXACT = new Set([\n  'last name', 'first name', 'middle name', 'generation code', 'ssn',\n  'date of birth', 'telephone number', 'customers info indicator', 'RELATIONSHIP code',\n  'current customers info', 'previous customers info', 'request data', 'response data', 'ind',\n]);\n\nconst JUNK = new Set([\n  'info', 'information', 'image', 'current customers info', 'previous customers info',\n  'current address', 'prev address', '2nd prev address', 'address information',\n  'number', 'control', 'code', 'providers', 'account', 'account information',\n  'reviews information', 'SOURCE_SYSTEM', 'bureau', 'name', 'n/a', 'none', 'unknown',\n  'request data', 'response data', 'last name', 'first name', 'middle name',\n  'generation code', 'customers info indicator', 'RELATIONSHIP code', 'street address',\n  'city', 'state', 'zip', 'zip extension', 'telephone number', 'ssn', 'date of birth', 'ind',\n]);\n\nfunction isLabelJunk(v) {\n  if (!v) return true;\n  const t = v.trim().toLowerCase();\n  if (LABEL_JUNK_EXACT.has(t)) return true;\n  if (/^(last name|first name|middle name|generation code|ssn|date of birth|telephone number|RELATIONSHIP code)(\\s+\\1|\\s+(last name|first name|middle name|generation code|ssn|date of birth|telephone number|RELATIONSHIP code|ind))+$/i.test(v.trim())) {\n    return true;\n  }\n  const labelHits = (v.match(/\\b(last name|first name|middle name|generation code|request data|response data|current customers info|previous customers info)\\b/gi) || []).length;\n  if (labelHits >= 2) return true;\n  return false;\n}\n\nfunction isJunk(v) {\n  if (!v) return true;\n  const t = v.trim().toLowerCase();\n  if (t.length < 1) return true;\n  if (JUNK.has(t)) return true;\n  if (isLabelJunk(v)) return true;\n  if (/^[^a-z0-9]+$/i.test(t)) return true;\n  return false;\n}\n\nfunction cleanSsn(value) {\n  if (!value) return null;\n  const digits = String(value).replace(/\\D/g, '');\n  return digits.length === 9 ? digits : null;\n}\n\nfunction isValidPersonNamePart(value, field) {\n  if (!value || isJunk(value) || isLabelJunk(value)) return false;\n  const v = value.trim().toUpperCase();\n  if (field === 'middle' && /^[A-Z]$/.test(v)) return true;\n  if (field === 'middle' && v.length <= 4 && /^[A-Z.]+$/.test(v)) return true;\n  if (v.split(/\\s+/).length > 4) return false;\n  return /^[A-Z][A-Z '\\-]*$/.test(v);\n}\n\nfunction isRepeatedLabelRow(text) {\n  if (!text) return false;\n  const t = text.trim();\n  const labelHits = (t.match(/\\b(last name|first name|middle name|generation code|request data|response data|current customers info|previous customers info|ssn|RELATIONSHIP code)\\b/gi) || []).length;\n  if (labelHits < 2) return false;\n  const stripped = t.replace(/\\b(last name|first name|middle name|generation code|request data|response data|current customers info|previous customers info|ssn|RELATIONSHIP code|ind)\\b/gi, ' ').replace(/\\s+/g, ' ').trim();\n  return !stripped || stripped.length < 2 || isLabelJunk(stripped);\n}\n\nfunction pickFirstRequestValue(line, labelRe) {\n  if (!line || isRepeatedLabelRow(line)) return null;\n  const cells = splitColumns(line);\n  for (const cell of cells) {\n    const v = cell.replace(/[\\[\\]]/g, '').trim();\n    if (!v || isJunk(v) || isLabelJunk(v)) continue;\n    if (labelRe && labelRe.test(v)) continue;\n    return v;\n  }\n  return null;\n}\n\nfunction extractLeftRequestColumn(rawLines, normalizedLines, labelRe, start, end) {\n  const idx = findLineIndex(normalizedLines, labelRe, start, end);\n  if (idx === -1) return { value: null, raw: null };\n\n  const labelLine = rawLines[idx] || normalizedLines[idx];\n  const sameLineVal = pickFirstRequestValue(labelLine, labelRe);\n  if (sameLineVal && !isRepeatedLabelRow(sameLineVal)) {\n    return { value: sameLineVal, raw: labelLine.trim() };\n  }\n\n  for (let i = idx + 1; i <= Math.min(idx + 10, end); i++) {\n    const raw = rawLines[i] || normalizedLines[i];\n    const norm = normalizedLines[i] || '';\n    if (!raw || isRepeatedLabelRow(raw)) continue;\n    if (/^(Last|First|Middle|Generation|SSN|Date of Birth|Telephone|RELATIONSHIP|Street|City|State|Zip)\\b/i.test(norm) && !/[|\\[]/.test(raw)) {\n      continue;\n    }\n    const cells = splitColumns(raw);\n    for (const cell of cells) {\n      const v = cell.replace(/[\\[\\]]/g, '').trim();\n      if (v && !isJunk(v) && !isLabelJunk(v) && !isRepeatedLabelRow(v)) return { value: v, raw: raw.trim() };\n    }\n    const left = leftColumn(raw);\n    if (left && !isJunk(left) && !isLabelJunk(left) && !isRepeatedLabelRow(left)) return { value: left, raw: raw.trim() };\n    const bare = raw.replace(/[\\[\\]|]/g, '').trim();\n    if (bare && !isJunk(bare) && !isLabelJunk(bare) && !isRepeatedLabelRow(bare) && bare.length <= 60) {\n      return { value: bare, raw: raw.trim() };\n    }\n  }\n  return { value: null, raw: null };\n}\n\nfunction finalizeResponseCode(value) {\n  if (!value) return null;\n  const v = String(value).replace(/\\s+/g, ' ').trim();\n  if (/^12-Information accurate as of last submission\\. Updated to\\b/i.test(v) && !/reflect latest account activity/i.test(v)) {\n    return '12-Information accurate as of last submission. Updated to reflect latest account activity.';\n  }\n  return v;\n}\n\nfunction extractResponseCode(raw, rawLines, normalizedLines) {\n  const stopLabels = [\n    /^COMPLIANCE\\s+Relevant\\s+Information/i,\n    /^Narrative\\s+Remarks/i,\n    /^SOURCE_SYSTEM\\b/i,\n    /^providers\\s+Code/i,\n    /^Account\\s+Number/i,\n    /^reviews\\s+Information/i,\n    /^Current\\s+customers\\s+Info/i,\n    /^Request\\s+Data/i,\n    /^Response\\s+Data/i,\n    /^Account\\s+Information/i,\n  ];\n\n  const respCodeIdx = findLineIndex(normalizedLines, /^Response\\s+Code\\b/i);\n  if (respCodeIdx !== -1) {\n    const parts = [];\n    for (let i = respCodeIdx + 1; i < normalizedLines.length; i++) {\n      const l = normalizedLines[i];\n      if (stopLabels.some((re) => re.test(l))) break;\n      if (/^reviews\\s+Code\\s+[12]\\b/i.test(l)) continue;\n      if (!l.trim()) continue;\n      const chunk = l.trim().replace(/^[\\[\\|]+|[\\|\\]]+$/g, '').trim();\n      if (chunk) parts.push(chunk);\n    }\n\n    for (let i = 0; i < parts.length; i++) {\n      const line = parts[i];\n      if (!/^\\d{2,3}-(?:Information|Updated|[A-Za-z])/i.test(line)) continue;\n      const collected = [line];\n      for (let j = i + 1; j < parts.length; j++) {\n        const next = parts[j];\n        if (/^\\d{3}\\s*[:\\\\-]/.test(next)) break;\n        if (/^\\d{2,3}-/.test(next)) break;\n        collected.push(next);\n      }\n      return finalizeResponseCode(collected.join(' ').replace(/\\s+/g, ' ').trim());\n    }\n\n    const combined = parts.join(' ').replace(/\\s+/g, ' ').trim();\n    const startIdx = combined.search(/\\d{2,3}-(?:Information|Updated|[A-Za-z])/i);\n    if (startIdx >= 0) {\n      return finalizeResponseCode(\n        combined\n          .slice(startIdx)\n          .replace(/\\s+(COMPLIANCE\\s+Relevant\\s+Information|Narrative\\s+Remarks|SOURCE_SYSTEM\\b|reviews\\s+Information|providers\\s+Code|Account\\s+Number|Current\\s+customers\\s+Info|Request\\s+Data|Response\\s+Data|Account\\s+Information).*$/i, '')\n          .trim()\n      );\n    }\n  }\n\n  const m = raw.match(/(\\d{2,3}-(?:Information|Updated)[\\s\\S]*?)(?:\\n|\\r|COMPLIANCE\\s+Relevant|Narrative\\s+Remarks|SOURCE_SYSTEM\\b|Account\\s+Information)/i);\n  if (m) return finalizeResponseCode(m[1].replace(/\\s+/g, ' ').trim());\n\n  const loose = raw.match(/(\\d{2,3}-(?:Information|Updated)[\\s\\S]{10,300})/i);\n  return finalizeResponseCode(loose ? loose[1].replace(/\\s+/g, ' ').trim() : null);\n}\n\nfunction parseAccountStatusRow(line, prefix) {\n  const re = new RegExp(`^${prefix}\\\\b`, 'i');\n  if (!re.test(line)) return null;\n  const rest = line.replace(re, '').replace(/^[\\s|]+/, '');\n  const tokens = rest.split(/\\s+|\\|+/).map((t) => t.replace(/[^\\w]/g, '').trim()).filter(Boolean);\n  if (!tokens.length) return null;\n\n  const nums = tokens.filter((t) => /^\\d{2,3}$/.test(t));\n  const portfolio = tokens.find((t) => /^[O0QFE]$/i.test(t) || /^F[E3]\\)?$/i.test(t));\n  const terms = tokens.find((t) => /^M$/i.test(t)) || tokens.find((t) => /^[A-Z]$/i.test(t));\n\n  return {\n    status: nums[0] || null,\n    account_type: nums[1] || null,\n    portfolio_type: portfolio ? (/^[O0Q]$/.test(String(portfolio).toUpperCase()) || /^F[E3]\\)?$/i.test(portfolio) ? 'O' : String(portfolio).toUpperCase().replace(/[^A-Z]/g, '')) : null,\n    terms_frequency: terms ? String(terms).toUpperCase().replace(/[^A-Z]/g, '') : null,\n  };\n}\n\nconst COMPLIANCE_DELINQ_LABEL = /COMPLIANCE\\s+(?:1(?:st|[°º*]|)|First)\\s+Date\\s+of\\s+Delinq(?:uency|q|uent|liquency)/i;\nconst DISPUTE_CODE_2_STANDARD = '023: Claims account closed. Verify Compliance Condition Code, Special Comment Code, and Date Closed.';\n\nfunction isInvalidDisputeBody(body) {\n  if (!body) return true;\n  const t = String(body).trim().toLowerCase().replace(/\\.$/, '');\n  if (t.length < 10) return true;\n\n  const invalidLabels = [\n    'response code',\n    'response date',\n    'response due date',\n    'date received',\n    'COMPLIANCE relevant information',\n    'narrative remarks',\n    'SOURCE_SYSTEM',\n    'providers code',\n    'account number',\n    'reviews information',\n    'reviews code 1',\n    'reviews code 2',\n  ];\n\n  return invalidLabels.some((label) => t === label || t.startsWith(label));\n}\n\nfunction finalizeDisputeCode2(val) {\n  if (!val) return null;\n  const m = String(val).match(/^(\\d{3}):\\s*(.+?)\\.?$/);\n  if (!m) return val;\n  if (m[1] === '023' && isInvalidDisputeBody(m[2])) return DISPUTE_CODE_2_STANDARD;\n  return val.endsWith('.') ? val : `${val.replace(/\\.$/, '')}.`;\n}\n\nfunction extractCOMPLIANCEFirstDelinquency(rawLines, normalizedLines) {\n  for (let i = 0; i < normalizedLines.length; i++) {\n    if (!/^Request\\b/i.test(normalizedLines[i])) continue;\n    const dates = [...normalizedLines[i].matchAll(/(\\d{1,2}\\/\\d{1,2}\\/\\d{4})/g)].map((x) => normalizeDate(x[1]));\n    if (dates.length >= 5) return dates[4];\n  }\n\n  const labelIdx = findLineIndex(normalizedLines, COMPLIANCE_DELINQ_LABEL);\n  if (labelIdx !== -1) {\n    for (let i = labelIdx; i < Math.min(labelIdx + 10, normalizedLines.length); i++) {\n      const line = normalizedLines[i];\n      if (/^Request\\b/i.test(line)) {\n        const dates = [...line.matchAll(/(\\d{1,2}\\/\\d{1,2}\\/\\d{4})/g)].map((x) => normalizeDate(x[1]));\n        if (dates.length >= 5) return dates[4];\n        if (dates.length) return dates[dates.length - 1];\n      }\n      const dates = [...line.matchAll(/(\\d{1,2}\\/\\d{1,2}\\/\\d{4})/g)].map((x) => normalizeDate(x[1]));\n      if (dates.length && i > labelIdx) return dates[dates.length - 1];\n    }\n  }\n\n  const datesHdr = findLineIndex(normalizedLines, /Date\\s+Opened.*(?:Date\\s+Closed|COMPLIANCE)/i);\n  if (datesHdr !== -1) {\n    for (let i = datesHdr + 1; i < Math.min(datesHdr + 8, normalizedLines.length); i++) {\n      if (!/^Request\\b/i.test(normalizedLines[i])) continue;\n      const dates = [...normalizedLines[i].matchAll(/(\\d{1,2}\\/\\d{1,2}\\/\\d{4})/g)].map((x) => normalizeDate(x[1]));\n      if (dates.length >= 5) return dates[4];\n    }\n  }\n\n  const rawText = normalizedLines.join('\\n');\n  const m = rawText.match(/COMPLIANCE\\s+(?:1(?:st|[°º*]|)|First)\\s+Date\\s+of\\s+Delin[^\\n]{0,60}[\\s\\S]{0,250}?(\\d{1,2}\\/\\d{1,2}\\/\\d{4})/i);\n  return m ? normalizeDate(m[1]) : null;\n}\n\nfunction extractRELATIONSHIPCodeGlobal(rawLines, normalizedLines) {\n  const ignoreExact = new Set([\n    'request data', 'response data', 'current customers info', 'previous customers info',\n    'RELATIONSHIP code', 'ind', 'street address', 'city', 'state', 'zip', 'RELATIONSHIP',\n  ]);\n\n  for (let idx = 0; idx < normalizedLines.length; idx++) {\n    if (!/^RELATIONSHIP(?:\\s+Code)?(\\s+RELATIONSHIP(?:\\s+Code)?)*$/i.test(normalizedLines[idx].trim())) continue;\n    for (let i = idx; i <= Math.min(idx + 8, normalizedLines.length - 1); i++) {\n      const line = (rawLines[i] || normalizedLines[i] || '').trim();\n      if (!line) continue;\n      if (i > idx && /^(Request|Response|Current|Previous|Street|City|State|Zip|SSN|Telephone|customers|Last|First|Middle)\\b/i.test(line)) break;\n\n      const cells = splitColumns(line);\n      for (const cell of cells) {\n        const v = cell.replace(/[\\[\\]|]/g, '').trim();\n        if (!v || ignoreExact.has(v.toLowerCase()) || isLabelJunk(v)) continue;\n        if (/^[1-9]$/.test(v)) return v;\n        if (/^L[i1I!]$/i.test(v)) return '1';\n        const digits = v.replace(/[^\\d]/g, '');\n        if (/^[1-9]$/.test(digits)) return digits;\n      }\n\n      const bare = line.replace(/[\\[\\]|]/g, '').trim();\n      if (ignoreExact.has(bare.toLowerCase()) || isLabelJunk(bare)) continue;\n      if (/^[1-9]$/.test(bare)) return bare;\n      if (/^L[i1I!]$/i.test(bare)) return '1';\n    }\n  }\n  return null;\n}\n\nfunction extractDisputeCode2Fallback(normalizedLines) {\n  const stopLabels = [\n    /^COMPLIANCE\\s+Relevant\\s+Information/i,\n    /^Narrative\\s+Remarks/i,\n    /^SOURCE_SYSTEM\\b/i,\n    /^Account\\s+Information/i,\n    /^providers\\s+Code/i,\n  ];\n\n  const labelIdx = findLineIndex(normalizedLines, /^reviews\\s+Code\\s+2\\b/i);\n  const start = labelIdx !== -1 ? labelIdx : 0;\n  const end = labelIdx !== -1 ? Math.min(labelIdx + 20, normalizedLines.length) : Math.min(start + 30, normalizedLines.length);\n\n  for (let i = start; i < end; i++) {\n    const l = normalizedLines[i];\n    if (i > start && stopLabels.some((re) => re.test(l))) break;\n    if (/^Response\\s+Date\\b/i.test(l)) continue;\n\n    const m = l.match(/\\b(023)\\s*[:\\\\-]\\s*(.+)/i) || l.match(/\\b(023)\\s+(.+)/i);\n    if (m) {\n      let body = m[2]\n        .replace(/\\s+\\d{2,3}-.+$/i, '')\n        .replace(/\\s*\\[.*$/, '')\n        .replace(/\\s*\\|.*$/, '')\n        .replace(/\\s+/g, ' ')\n        .trim();\n      if (body.length >= 8 && !isInvalidDisputeBody(body)) {\n        let val = `023: ${body}`;\n        return val.endsWith('.') ? val : `${val}.`;\n      }\n      return DISPUTE_CODE_2_STANDARD;\n    }\n  }\n\n  const disputeStart = findLineIndex(normalizedLines, /reviews\\s+Information/i);\n  const disputeEnd = findLineIndex(normalizedLines, /^SOURCE_SYSTEM\\b/i);\n  if (disputeStart !== -1) {\n    const block = normalizedLines.slice(disputeStart, disputeEnd !== -1 ? disputeEnd : disputeStart + 35).join(' ');\n    if (/\\b023\\b/.test(block)) return DISPUTE_CODE_2_STANDARD;\n  }\n  return null;\n}\n\nfunction extractRELATIONSHIPCode(rawLines, normalizedLines, consumerStart, end) {\n  const RELATIONSHIPIdx = findLineIndex(normalizedLines, /^RELATIONSHIP\\s+Code(\\s+RELATIONSHIP\\s+Code)*$/i, consumerStart, end + 30);\n  if (RELATIONSHIPIdx === -1) return null;\n\n  const sameLine = pickFirstRequestValue(rawLines[RELATIONSHIPIdx] || normalizedLines[RELATIONSHIPIdx], /^RELATIONSHIP\\s+Code/i);\n  if (sameLine) {\n    const code = sameLine.replace(/[^\\d]/g, '');\n    if (/^[1-9]$/.test(code)) return code;\n    if (/^L[i1I!]$/i.test(sameLine.trim())) return '1';\n  }\n\n  for (let i = RELATIONSHIPIdx + 1; i <= Math.min(RELATIONSHIPIdx + 8, end + 30); i++) {\n    const line = (rawLines[i] || normalizedLines[i] || '').trim();\n    if (!line) continue;\n    if (/^(Request|Response|Current|Previous|Street|City|State|Zip|SSN|Telephone|customers|Last|First|Middle)\\b/i.test(line)) break;\n\n    const cells = splitColumns(line);\n    for (const cell of cells) {\n      const v = cell.replace(/[\\[\\]|]/g, '').trim();\n      if (!v || isLabelJunk(v)) continue;\n      if (/^\\d{1,2}$/.test(v)) return v;\n      if (/^L[i1I!]$/i.test(v)) return '1';\n    }\n\n    const bare = line.replace(/[\\[\\]|]/g, '').trim();\n    if (/^\\d{1,2}$/.test(bare) && !isLabelJunk(bare)) return bare;\n    if (/^L[i1I!]$/i.test(bare)) return '1';\n  }\n  return null;\n}\n\nfunction splitColumns(line) {\n  if (!line) return [];\n  if (line.includes('|')) {\n    return line.split('|').map((c) => c.replace(/[\\[\\]]/g, '').trim()).filter(Boolean);\n  }\n  const parts = line.split(/\\s{3,}/).map((c) => c.trim()).filter(Boolean);\n  return parts.length ? parts : [line.trim()];\n}\n\nfunction leftColumn(line) {\n  if (!line) return null;\n  const cut = line.replace(/\\s{4,}.*$/, '').replace(/[\\[\\]|]/g, '').trim();\n  return cut || null;\n}\n\nfunction findLineIndex(lines, pattern, start = 0, end = lines.length) {\n  const re = pattern instanceof RegExp ? pattern : new RegExp(pattern, 'i');\n  for (let i = start; i < end; i++) {\n    if (re.test(lines[i])) return i;\n  }\n  return -1;\n}\n\nfunction extractBetweenLabels(raw, startLabel, endLabel) {\n  const s = new RegExp(startLabel, 'i');\n  const e = endLabel ? new RegExp(endLabel, 'i') : null;\n  const start = raw.search(s);\n  if (start === -1) return null;\n  const from = start + raw.match(s)[0].length;\n  const rest = raw.slice(from);\n  if (!e) return rest.trim();\n  const end = rest.search(e);\n  return (end === -1 ? rest : rest.slice(0, end)).trim();\n}\n\nfunction extractHeaderIds(raw, rawLines) {\n  let DOCUMENT_FORMId = null;\n  let DOCUMENT_FORMControlNumber = null;\n\n  const headerMatch = raw.match(/DOCUMENT_FORM\\s+(A-\\d{6,})\\s+DOCUMENT_FORM\\s+Control\\s+Number\\s+(\\d{10,})/i);\n  if (headerMatch) {\n    DOCUMENT_FORMId = headerMatch[1].toUpperCase();\n    DOCUMENT_FORMControlNumber = headerMatch[2];\n  }\n\n  if (!DOCUMENT_FORMId) {\n    const m = raw.match(/\\b(A-\\d{6,})\\b/i);\n    if (m) DOCUMENT_FORMId = m[1].toUpperCase();\n  }\n  if (!DOCUMENT_FORMControlNumber) {\n    const m = raw.match(/DOCUMENT_FORM\\s+Control\\s+Number\\s*[:\\|]?\\s*(\\d{10,})/i);\n    if (m) DOCUMENT_FORMControlNumber = m[1];\n  }\n  if (!DOCUMENT_FORMId) {\n    const idx = findLineIndex(rawLines, /^DOCUMENT_FORM\\s+A-/i);\n    if (idx !== -1) {\n      const m = rawLines[idx].match(/\\b(A-\\d{6,})\\b/i);\n      if (m) DOCUMENT_FORMId = m[1].toUpperCase();\n    }\n  }\n\n  return { DOCUMENT_FORM_id: DOCUMENT_FORMId, DOCUMENT_SYSTEM_DOCUMENT_FORM_number: DOCUMENT_FORMId, DOCUMENT_FORM_control_number: DOCUMENT_FORMControlNumber };\n}\n\nfunction extractDisputeInfo(raw, rawLines, normalizedLines) {\n  const out = {\n    date_received: null,\n    response_due_date: null,\n    response_date: null,\n    response_code: null,\n    dispute_code_1: null,\n    dispute_code_2: null,\n    COMPLIANCE_relevant_information: null,\n    narrative_remarks: null,\n  };\n\n  const dc1Idx = findLineIndex(normalizedLines, /^reviews\\s+Code\\s+1\\b/i);\n  if (dc1Idx !== -1) {\n    const dc1Date = normalizedLines[dc1Idx].match(/(\\d{1,2}\\/\\d{1,2}\\/\\d{4})/);\n    if (dc1Date) out.date_received = normalizeDate(dc1Date[1]);\n  }\n  if (!out.date_received) {\n    const dateReceived = raw.match(/Date\\s+Received[\\s\\S]{0,120}?(\\d{1,2}\\/\\d{1,2}\\/\\d{4})/i);\n    if (dateReceived) out.date_received = normalizeDate(dateReceived[1]);\n  }\n\n  const dueLabelIdx = findLineIndex(normalizedLines, /^Response\\s+Due\\s+Date\\b/i);\n  if (dueLabelIdx !== -1) {\n    const respDateLabelIdx = findLineIndex(normalizedLines, /^Response\\s+Date\\b/i, dueLabelIdx + 1);\n    const endIdx = respDateLabelIdx !== -1\n      ? respDateLabelIdx - 1\n      : Math.min(dueLabelIdx + 15, normalizedLines.length - 1);\n    const blockDates = [];\n    for (let i = dueLabelIdx + 1; i <= endIdx; i++) {\n      for (const m of normalizedLines[i].matchAll(/(\\d{1,2}\\/\\d{1,2}\\/\\d{4})/g)) {\n        blockDates.push(normalizeDate(m[1]));\n      }\n    }\n    const distinctDue = blockDates.filter((d) => d && d !== out.date_received);\n    if (distinctDue.length) {\n      out.response_due_date = distinctDue[distinctDue.length - 1];\n    } else if (blockDates.length) {\n      out.response_due_date = blockDates[blockDates.length - 1];\n    }\n  }\n\n  if (!out.response_due_date && dc1Idx !== -1) {\n    for (let i = dc1Idx + 1; i < Math.min(dc1Idx + 10, normalizedLines.length); i++) {\n      if (/^Response\\s+Date\\b/i.test(normalizedLines[i])) break;\n      const bracketDate = normalizedLines[i].match(/[\\[\\(]\\s*(\\d{1,2}\\/\\d{1,2}\\/\\d{4})\\s*[\\]\\|\\)]/);\n      if (bracketDate) {\n        out.response_due_date = normalizeDate(bracketDate[1]);\n        break;\n      }\n      const plainDate = normalizedLines[i].match(/(\\d{1,2}\\/\\d{1,2}\\/\\d{4})/);\n      if (plainDate) {\n        const d = normalizeDate(plainDate[1]);\n        if (d && d !== out.date_received) {\n          out.response_due_date = d;\n          break;\n        }\n      }\n    }\n  }\n\n  if (!out.response_due_date) {\n    const responseDue = raw.match(/Response\\s+Due\\s+Date[\\s\\S]{0,1200}?(\\d{1,2}\\/\\d{1,2}\\/\\d{4})/i);\n    if (responseDue) {\n      const d = normalizeDate(responseDue[1]);\n      if (d && d !== out.date_received) out.response_due_date = d;\n    }\n  }\n\n  const respDateLabelIdx = findLineIndex(normalizedLines, /^Response\\s+Date\\b/i);\n  if (respDateLabelIdx !== -1) {\n    const endIdx = Math.min(respDateLabelIdx + 10, normalizedLines.length - 1);\n    for (let i = respDateLabelIdx; i <= endIdx; i++) {\n      const line = normalizedLines[i];\n      if (/^Response\\s+Code\\b/i.test(line)) break;\n      const dt = line.match(/(\\d{1,2}\\/\\d{1,2}\\/\\d{4})(?:\\s+(\\d{1,2}:\\d{2})(?::(\\d{2}))?)?/);\n      if (!dt) continue;\n      const dateOnly = normalizeDate(dt[1]);\n      if (dt[2]) {\n        out.response_date = normalizeDateTime(dt[0]);\n        break;\n      }\n      if (dateOnly && dateOnly !== out.date_received && dateOnly !== out.response_due_date) {\n        out.response_date = dateOnly;\n        break;\n      }\n    }\n  }\n\n  if (!out.response_date) {\n    const responseDate = raw.match(/Response\\s+Date[\\s\\S]{0,400}?(\\d{1,2}\\/\\d{1,2}\\/\\d{4}(?:\\s+\\d{1,2}:\\d{2})?)/i);\n    if (responseDate) {\n      const candidate = normalizeDateTime(responseDate[1]);\n      const candidateDate = candidate ? candidate.slice(0, 10) : null;\n      if (candidate && candidateDate !== out.date_received && candidateDate !== out.response_due_date) {\n        out.response_date = candidate;\n      }\n    }\n  }\n\n  out.response_code = extractResponseCode(raw, rawLines, normalizedLines);\n  out._response_code_raw = out.response_code || null;\n\n  function extractDisputeCode(n) {\n    const pat = new RegExp(`^reviews\\\\s+Code\\\\s+${n}\\\\b`, 'i');\n    const idx = normalizedLines.findIndex((l) => pat.test(l));\n    if (idx === -1) return null;\n    for (let i = idx + 1; i < Math.min(idx + 12, normalizedLines.length); i++) {\n      let l = normalizedLines[i];\n      if (/^reviews\\s+Code\\s+[12]\\b/i.test(l) && !pat.test(l)) break;\n      if (/^Response\\s+Date\\b/i.test(l)) continue;\n      if (/^Response\\s+Code\\b/i.test(l) && n === '2') continue;\n      const m = l.match(/^(\\d{3})\\s*[:\\\\-]\\s*(.+)$/);\n      if (!m) continue;\n      let body = m[2].trim();\n      const next = normalizedLines[i + 1] || '';\n      if (\n        next\n        && !/^\\d{3}\\s*[:\\\\-]/.test(next)\n        && !/^reviews\\s+Code/i.test(next)\n        && !/^Response\\b/i.test(next)\n        && !/^\\d{2,3}-/.test(next.trim())\n        && next.length < 160\n      ) {\n        body += ' ' + next.trim();\n      }\n      let val = `${m[1]}: ${body}`;\n      val = val\n        .replace(/\\s{2,}\\d{1,2}\\/\\d{1,2}\\/\\d{4}.*$/, '')\n        .replace(/\\s*\\[.*$/, '')\n        .replace(/\\s*\\|.*$/, '')\n        .replace(/\\s+(Response\\s+Due\\s+Date|Response\\.?\\s*Date|Response\\s+Code).*$/i, '')\n        .replace(/\\s+\\d{2,3}-.+$/i, '')\n        .replace(/\\s+/g, ' ')\n        .trim();\n      if (val.length > 8) {\n        const result = val.endsWith('.') ? val : `${val}.`;\n        if (n === '2') return finalizeDisputeCode2(result);\n        return result;\n      }\n    }\n    return null;\n  }\n\n  out.dispute_code_1 = extractDisputeCode('1');\n  out.dispute_code_2 = finalizeDisputeCode2(extractDisputeCode('2') || extractDisputeCode2Fallback(normalizedLines));\n  out._dispute_code_2_raw = out.dispute_code_2 || null;\n\n  const COMPLIANCEIdx = findLineIndex(normalizedLines, /^COMPLIANCE\\s+Relevant\\s+Information/i);\n  if (COMPLIANCEIdx !== -1) {\n    const parts = [];\n    for (let i = COMPLIANCEIdx + 1; i < Math.min(COMPLIANCEIdx + 6, normalizedLines.length); i++) {\n      const l = normalizedLines[i];\n      if (/^Narrative\\s+Remarks/i.test(l) || /^SOURCE_SYSTEM\\b/i.test(l)) break;\n      if (l.trim()) parts.push(l.trim());\n    }\n    if (parts.length) out.COMPLIANCE_relevant_information = parts.join(' ').replace(/\\s+/g, ' ').trim();\n  }\n\n  const narrIdx = findLineIndex(normalizedLines, /^Narrative\\s+Remarks/i);\n  if (narrIdx !== -1) {\n    const next = (normalizedLines[narrIdx + 1] || '').trim();\n    if (next && !/^SOURCE_SYSTEM\\b/i.test(next)) out.narrative_remarks = next;\n  }\n\n  return out;\n}\n\nfunction extractSOURCE_SYSTEMRow(rawLines, normalizedLines) {\n  const out = { SOURCE_SYSTEM: null, subscriber_code: null, image_count: null, consumer_account_number: null };\n  const hdr = findLineIndex(normalizedLines, /SOURCE_SYSTEM.*providers\\s+Code.*Account\\s+Number/i);\n  if (hdr === -1) return out;\n\n  const dataLine = rawLines[hdr + 1] || normalizedLines[hdr + 1] || '';\n  const cells = splitColumns(dataLine);\n  if (cells[0] && !isJunk(cells[0])) out.SOURCE_SYSTEM = cells[0].replace(/^\\[/, '').trim();\n  if (cells[1]) out.subscriber_code = cleanCode(cells[1]);\n\n  const imageCell = cells.find((c) => /^\\d+$/.test(c));\n  const ocrZero = cells.find((c) => /^[oO0]$/.test(c)) || (/\\[\\s*o\\s*\\|/i.test(dataLine) ? '0' : null);\n  if (imageCell) out.image_count = imageCell;\n  else if (ocrZero) out.image_count = '0';\n  else {\n    const img = dataLine.match(/\\|\\s*(\\d+)\\s*\\|/);\n    out.image_count = img ? img[1] : '0';\n  }\n\n  let acctRaw = null;\n  let acct = null;\n  for (let i = cells.length - 1; i >= 0; i--) {\n    const rawCell = cells[i].replace(/[\\[\\]]/g, '').trim();\n    const candidate = cleanAccountNumber(rawCell);\n    if (candidate && candidate.length >= 8) {\n      acctRaw = rawCell;\n      acct = candidate;\n      break;\n    }\n  }\n  if (!acct) {\n    const m = dataLine.match(/([A-Z0-9#]{8,})/i);\n    if (m) {\n      acctRaw = m[1];\n      acct = cleanAccountNumber(m[1]);\n    }\n  }\n  const wrap = (rawLines[hdr + 2] || '').trim();\n  if (wrap && /^[A-Z0-9]{1,8}$/i.test(wrap) && acct && !acct.endsWith(wrap.toUpperCase())) {\n    acctRaw = (acctRaw || acct) + wrap;\n    acct = cleanAccountNumber(acct + wrap);\n  }\n  out.consumer_account_number = acct;\n  out._account_number_raw = acctRaw;\n  out._account_number_normalized = acct;\n  return out;\n}\n\nfunction extractConsumerInfo(rawLines, normalizedLines) {\n  const out = {\n    last_name: null,\n    first_name: null,\n    middle_name: null,\n    resident_name: null,\n    ssn: null,\n    date_of_birth: null,\n    phone: null,\n    RELATIONSHIP_code: null,\n  };\n\n  const SOURCE_SYSTEMIdx = findLineIndex(normalizedLines, /SOURCE_SYSTEM.*providers\\s+Code/i);\n  let consumerStart = SOURCE_SYSTEMIdx !== -1\n    ? findLineIndex(normalizedLines, /Current\\s+customers\\s+Info/i, SOURCE_SYSTEMIdx)\n    : findLineIndex(normalizedLines, /Current\\s+customers\\s+Info/i);\n  if (consumerStart === -1) consumerStart = 0;\n  const addrHdr = findLineIndex(normalizedLines, /Current\\s+Address/i, consumerStart);\n  const end = addrHdr !== -1 ? addrHdr : consumerStart + 80;\n  const blockLabel = normalizedLines.slice(consumerStart, Math.min(consumerStart + 3, end)).join(' | ');\n\n  const last = extractLeftRequestColumn(rawLines, normalizedLines, /^Last\\s+Name(\\s+Last\\s+Name|\\s+Ind)*$/i, consumerStart, end);\n  const first = extractLeftRequestColumn(rawLines, normalizedLines, /^First\\s+Name(\\s+First\\s+Name)*$/i, consumerStart, end);\n  const middle = extractLeftRequestColumn(rawLines, normalizedLines, /^Middle\\s+Name(\\s+Middle\\s+Name)*$/i, consumerStart, end);\n\n  if (last.value && isValidPersonNamePart(last.value, 'last')) out.last_name = last.value.toUpperCase().replace(/\\s+/g, ' ');\n  if (first.value && isValidPersonNamePart(first.value, 'first')) {\n    out.first_name = first.value.toUpperCase().replace(/\\s+/g, ' ').replace(/^L(?=[A-Z])/, '');\n  }\n  if (middle.value && isValidPersonNamePart(middle.value, 'middle')) {\n    out.middle_name = middle.value.toUpperCase().replace(/\\s+/g, ' ');\n  }\n\n  out.resident_name = [out.first_name, out.middle_name, out.last_name].filter(Boolean).join(' ') || null;\n\n  const ssnCol = extractLeftRequestColumn(rawLines, normalizedLines, /^SSN(\\s+SSN)*$/i, consumerStart, end);\n  if (ssnCol.value) out.ssn = cleanSsn(ssnCol.value);\n\n  const dobIdx = findLineIndex(normalizedLines, /^Date\\s+of\\s+Birth(\\s+Date\\s+of\\s+Birth)*$/i, consumerStart, end + 20);\n  if (dobIdx !== -1) {\n    for (let i = dobIdx + 1; i <= Math.min(dobIdx + 6, end + 20); i++) {\n      const line = rawLines[i] || normalizedLines[i];\n      const slash = line.match(/(\\d{1,2}\\/\\d{1,2}\\/\\d{4})/);\n      if (slash) {\n        out.date_of_birth = normalizeDate(slash[1]);\n        break;\n      }\n      const compact = line.match(/\\[\\s*(\\d{8,10})\\s*\\|/) || line.match(/[\\[\\|]\\s*(\\d{8,10})\\s*[\\]\\|{]/);\n      if (compact) {\n        out.date_of_birth = parseCompactDob(compact[1]);\n        if (out.date_of_birth) break;\n      }\n      const left = extractLeftRequestColumn(rawLines, normalizedLines, /^Date\\s+of\\s+Birth/i, dobIdx, dobIdx + 3);\n      if (left.value) {\n        const d = normalizeDate(left.value) || parseCompactDob(left.value);\n        if (d) { out.date_of_birth = d; break; }\n      }\n    }\n  }\n\n  const telCol = extractLeftRequestColumn(rawLines, normalizedLines, /^Telephone\\s+Number(\\s+Telephone\\s+Number)*$/i, consumerStart, end + 20);\n  if (telCol.value) out.phone = cleanPhone(telCol.value);\n\n  const RELATIONSHIPCol = extractLeftRequestColumn(rawLines, normalizedLines, /^RELATIONSHIP\\s+Code(\\s+RELATIONSHIP\\s+Code)*$/i, consumerStart, end + 30);\n  if (RELATIONSHIPCol.value) {\n    let code = RELATIONSHIPCol.value.replace(/[^\\d]/g, '');\n    if (!code && /^L[i1I!]$/i.test(RELATIONSHIPCol.value.trim())) code = '1';\n    if (code && /^[1-9]$/.test(code)) out.RELATIONSHIP_code = code;\n  }\n  if (!out.RELATIONSHIP_code) out.RELATIONSHIP_code = extractRELATIONSHIPCode(rawLines, normalizedLines, consumerStart, end);\n  if (!out.RELATIONSHIP_code) out.RELATIONSHIP_code = extractRELATIONSHIPCodeGlobal(rawLines, normalizedLines);\n\n  out._consumer_info_block_used = blockLabel;\n  out._last_name_raw = last.raw;\n  out._first_name_raw = first.raw;\n  out._middle_name_raw = middle.raw;\n  return out;\n}\n\nfunction buildAddress(street, city, state, zip, zipExt) {\n  if (!street) return null;\n  const parts = [street.trim()];\n  if (city) parts.push(city.trim().toUpperCase());\n  let zipFull = zip || '';\n  if (zipFull && zipExt) zipFull += `-${zipExt}`;\n  if (state || zipFull) parts.push([state, zipFull].filter(Boolean).join(' ').trim());\n  return parts.join(', ');\n}\n\nfunction extractAddresses(rawLines, normalizedLines) {\n  const out = {\n    tenant_address: null,\n    previous_address: null,\n    second_previous_address: null,\n  };\n\n  const addrHdr = findLineIndex(normalizedLines, /Current\\s+Address.*Prev\\s+Address/i);\n  if (addrHdr === -1) return out;\n\n  const streetHdr = findLineIndex(normalizedLines, /^Street\\s+Address/i, addrHdr, addrHdr + 8);\n  let streets = [null, null, null];\n  if (streetHdr !== -1) {\n    for (let i = streetHdr + 1; i < Math.min(streetHdr + 5, normalizedLines.length); i++) {\n      const l = rawLines[i] || normalizedLines[i];\n      if (!l || /^(City|State|Zip|Street\\s+Address)/i.test(l)) break;\n      if (/\\d/.test(l) && /[A-Za-z]/.test(l)) {\n        const cols = l.split(/\\s{2,}|\\t+/).map((c) => c.replace(/[\\[\\]|_LdL]+/g, '').trim()).filter(Boolean);\n        if (!cols.length || cols.length < 2) {\n          const fallback = l.match(/^(.+?\\d)\\s+L[_d]{0,3}\\s+(.+?\\d)\\s+L[d_]?\\s+(.+)$/i);\n          if (fallback) {\n            cols.length = 0;\n            cols.push(fallback[1].trim(), fallback[2].trim(), fallback[3].trim());\n          }\n        }\n        streets = [cols[0] || null, cols[1] || null, cols[2] || null];\n        break;\n      }\n    }\n  }\n\n  function columnValues(labelRe, colCount = 3) {\n    const idx = findLineIndex(normalizedLines, labelRe, addrHdr, addrHdr + 25);\n    if (idx === -1) return [];\n    const line = rawLines[idx + 1] || normalizedLines[idx + 1] || '';\n    if (line.includes('|')) {\n      return splitColumns(line).slice(0, colCount);\n    }\n    return line.split(/\\s{2,}/).map((c) => c.replace(/[\\[\\]|{}]/g, '').trim()).filter(Boolean).slice(0, colCount);\n  }\n\n  const cities = columnValues(/^City(\\s+City)+/i);\n  const states = columnValues(/^State(\\s+State)+/i);\n  const zips = columnValues(/^Zi(p)?(\\s+(Zip|Zi))+/i);\n  const zipExts = columnValues(/^Zip\\s+Extension(\\s+Zip\\s+Extension)+/i);\n\n  const normState = (s) => {\n    if (!s) return null;\n    const t = s.replace(/[^A-Za-z]/g, '').toUpperCase();\n    if (t === 'W' || t === 'WI' || t === 'LW' || t === 'LI') return 'WI';\n    return t.length === 2 ? t : null;\n  };\n\n  out.tenant_address = buildAddress(streets[0], cities[0], normState(states[0]), (zips[0] || '').replace(/\\D/g, '').slice(0, 5), (zipExts[0] || '').replace(/\\D/g, '').slice(0, 4));\n  out.previous_address = buildAddress(streets[1], cities[1], normState(states[1]), (zips[1] || '').replace(/\\D/g, '').slice(0, 5), (zipExts[1] || '').replace(/\\D/g, '').slice(0, 4));\n  out.second_previous_address = buildAddress(streets[2], cities[2], normState(states[2]), (zips[2] || '').replace(/\\D/g, '').slice(0, 5), (zipExts[2] || '').replace(/\\D/g, '').slice(0, 4));\n\n  return out;\n}\n\nfunction extractAccountInfo(rawLines, normalizedLines) {\n  const out = {\n    account_status: null,\n    response_account_status: null,\n    account_type: null,\n    portfolio_type: null,\n    terms_frequency: null,\n    current_balance: null,\n    past_due_balance: null,\n    highest_credit_limit: null,\n    actual_payment_amount: null,\n    date_opened: null,\n    date_of_account_information: null,\n    date_of_last_payment: null,\n    account_closed_date: null,\n    date_first_delinquency: null,\n  };\n\n  const acctInfoHdr = findLineIndex(normalizedLines, /^Account\\s+Information$/i);\n  const statusHdr = acctInfoHdr !== -1\n    ? findLineIndex(normalizedLines, /^Account\\s+Status$/i, acctInfoHdr, acctInfoHdr + 20)\n    : findLineIndex(normalizedLines, /^Account\\s+Status$/i);\n  if (statusHdr !== -1) {\n    let statusRaw = '';\n    for (let i = statusHdr; i < Math.min(statusHdr + 20, normalizedLines.length); i++) {\n      const l = normalizedLines[i];\n      statusRaw += (statusRaw ? ' | ' : '') + l;\n      if (/^Account\\s+Amounts/i.test(l) || /^Current\\s+Balance/i.test(l)) break;\n\n      const req = parseAccountStatusRow(l, 'Request') || (() => {\n        const m = l.match(/^Request[\\s|]*(\\d{2,3})[\\s|]+(\\d{1,2})[\\s|]+(\\S+)[\\s|]+(\\S+)/i);\n        if (!m) return null;\n        const pt = String(m[3]).toUpperCase();\n        return {\n          status: m[1],\n          account_type: m[2],\n          portfolio_type: /^[O0Q]$/.test(pt) || /^F[E3]\\)?$/i.test(m[3]) ? 'O' : pt.replace(/[^A-Z]/g, '') || null,\n          terms_frequency: String(m[4]).toUpperCase().replace(/[^A-Z]/g, '') || null,\n        };\n      })();\n      if (req && req.status) {\n        out.account_status = req.status;\n        if (req.account_type) out.account_type = req.account_type;\n        if (req.portfolio_type) out.portfolio_type = req.portfolio_type;\n        if (req.terms_frequency) out.terms_frequency = req.terms_frequency;\n      }\n\n      const res = parseAccountStatusRow(l, 'Response') || (() => {\n        const m = l.match(/^Response[\\s|]*(\\d{2,3})[\\s|]+(\\d{1,2})/i);\n        return m ? { status: m[1] } : null;\n      })();\n      if (res && res.status) out.response_account_status = res.status;\n    }\n\n    if (!out.account_status) {\n      const fb = statusRaw.match(/Request[\\s|]+(\\d{2,3})[\\s|]+(\\d{1,2})[\\s|]+([O0QFE][^\\s|]*)/i);\n      if (fb) {\n        out.account_status = fb[1];\n        out.account_type = fb[2];\n        const pt = String(fb[3]).toUpperCase();\n        out.portfolio_type = /^[O0Q]$/.test(pt) ? 'O' : pt.replace(/[^A-Z]/g, '') || null;\n      }\n    }\n    if (!out.response_account_status) {\n      const resFb = statusRaw.match(/Response[\\s|]+(\\d{2,3})[\\s|]+(\\d{1,2})/i);\n      if (resFb) out.response_account_status = resFb[1];\n    }\n    out._account_status_raw = statusRaw;\n  }\n\n  const amtHdr = acctInfoHdr !== -1\n    ? findLineIndex(normalizedLines, /Current\\s+Balance.*Amount\\s+Past\\s+Due/i, acctInfoHdr, acctInfoHdr + 30)\n    : findLineIndex(normalizedLines, /Current\\s+Balance.*Amount\\s+Past\\s+Due/i);\n  if (amtHdr !== -1) {\n    for (let i = amtHdr + 1; i < Math.min(amtHdr + 6, normalizedLines.length); i++) {\n      const m = normalizedLines[i].match(/^Request\\s+([\\d,\\.]+)\\s+([\\d,\\.]+)\\s+([\\d,\\.]+)\\s+([\\d,\\.]+)/i);\n      if (m) {\n        out.current_balance = cleanMoney(m[1]);\n        out.past_due_balance = cleanMoney(m[2]);\n        out.highest_credit_limit = cleanMoney(m[3]);\n        out.actual_payment_amount = cleanMoney(m[4]);\n        break;\n      }\n    }\n  }\n\n  const datesHdr = acctInfoHdr !== -1\n    ? findLineIndex(normalizedLines, /Date\\s+Opened.*(?:Date\\s+Closed|COMPLIANCE)/i, acctInfoHdr, acctInfoHdr + 40)\n    : findLineIndex(normalizedLines, /Date\\s+Opened.*(?:Date\\s+Closed|COMPLIANCE)/i);\n  if (datesHdr !== -1) {\n    for (let i = datesHdr + 1; i < Math.min(datesHdr + 8, normalizedLines.length); i++) {\n      if (!/^Request\\b/i.test(normalizedLines[i])) continue;\n      const dates = [...normalizedLines[i].matchAll(/(\\d{1,2}\\/\\d{1,2}\\/\\d{4})/g)].map((x) => normalizeDate(x[1]));\n      if (dates[0]) out.date_opened = dates[0];\n      if (dates[1]) out.date_of_account_information = dates[1];\n      if (dates[2]) out.date_of_last_payment = dates[2];\n      if (dates[3]) out.account_closed_date = dates[3];\n      if (dates[4]) out.date_first_delinquency = dates[4];\n      break;\n    }\n  }\n\n  if (!out.date_first_delinquency) {\n    out.date_first_delinquency = extractCOMPLIANCEFirstDelinquency(rawLines, normalizedLines);\n  }\n\n  return out;\n}\n\nfunction parseHistorySection(lines, startIdx) {\n  const years = {};\n  const monthOrder = ['Dec', 'Nov', 'Oct', 'Sep', 'Aug', 'Jul', 'Jun', 'May', 'Apr', 'Mar', 'Feb', 'Jan'];\n  const rawLines = [];\n  const yearLines = [];\n  let headerFound = false;\n\n  for (let i = startIdx; i < Math.min(startIdx + 3, lines.length); i++) {\n    if (/Year/i.test(lines[i]) && /Jan/i.test(lines[i])) headerFound = true;\n  }\n\n  for (let i = startIdx + 1; i < lines.length; i++) {\n    const l = lines[i].trim();\n    if (!l) continue;\n    rawLines.push(l);\n    if (/^(Response|Original|Submitted|Image)\\b/i.test(l) && i > startIdx + 1) break;\n    const m = l.match(/^(20\\d{2})\\s+(.+)$/);\n    if (m) yearLines.push({ year: m[1], tokens: m[2].trim().split(/\\s+/).filter(Boolean) });\n  }\n\n  if (!headerFound || yearLines.length === 0) {\n    return { years: {}, unreliable: true, rawText: rawLines.join(' | ') };\n  }\n\n  const maxYear = yearLines.map((y) => y.year).sort((a, b) => Number(b) - Number(a))[0];\n\n  for (const { year, tokens } of yearLines) {\n    const mapped = {};\n    const validTokens = tokens.every((t) => /^[A-Z0-9]{1,2}$/i.test(t));\n    if (!validTokens) return { years: {}, unreliable: true, rawText: rawLines.join(' | ') };\n\n    if (tokens.length <= 3 && String(year) === String(maxYear)) {\n      const recent = ['Jan', 'Feb', 'Mar'];\n      const offset = recent.length - tokens.length;\n      tokens.forEach((tok, ti) => { mapped[recent[offset + ti]] = tok; });\n    } else if (tokens.length <= monthOrder.length) {\n      tokens.forEach((tok, ti) => {\n        if (monthOrder[ti]) mapped[monthOrder[ti]] = tok;\n      });\n    } else {\n      return { years: {}, unreliable: true, rawText: rawLines.join(' | ') };\n    }\n    years[year] = mapped;\n  }\n  return { years, unreliable: false, rawText: null };\n}\n\nfunction historyToString(years) {\n  const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];\n  const parts = [];\n  const yearKeys = Object.keys(years).sort((a, b) => Number(b) - Number(a));\n  for (const y of yearKeys) {\n    const months = monthOrder.filter((m) => years[y][m]).map((m) => `${m} ${years[y][m]}`);\n    if (months.length) parts.push(`${y}: ${months.join(', ')}`);\n  }\n  return parts.join('; ') || null;\n}\n\nfunction extractAccountHistory(rawLines, normalizedLines) {\n  const originalIdx = findLineIndex(normalizedLines, /Original\\s+Account\\s+Hist/i);\n  const responseIdx = findLineIndex(normalizedLines, /Response\\s+Account\\s+History/i);\n\n  const originalParsed = originalIdx !== -1 ? parseHistorySection(normalizedLines, originalIdx) : { years: {}, unreliable: true };\n  const responseParsed = responseIdx !== -1 ? parseHistorySection(normalizedLines, responseIdx) : originalParsed;\n\n  const original = originalParsed.years || {};\n  const response = responseParsed.years || {};\n  const unreliable = originalParsed.unreliable || responseParsed.unreliable;\n  const rawHistory = [originalParsed.rawText, responseParsed.rawText].filter(Boolean).join(' || ') || null;\n\n  return {\n    original_account_history: original,\n    response_account_history: response,\n    account_history: unreliable ? null : (historyToString(response) || historyToString(original)),\n    account_history_original_text: historyToString(original),\n    account_history_response_text: historyToString(response),\n    account_history_raw: rawHistory,\n    account_history_unreliable: unreliable,\n  };\n}\n\nfunction extractSubmittedBy(rawLines, normalizedLines) {\n  const out = { submitted_by: null, submitted_by_phone: null, date_submitted: null };\n  const idx = findLineIndex(normalizedLines, /Submitted\\s+By.*Telephone\\s+Number.*Date\\s+Submitted/i);\n  if (idx === -1) return out;\n\n  const line = rawLines[idx + 1] || normalizedLines[idx + 1] || '';\n  const cells = splitColumns(line);\n  if (cells[0]) out.submitted_by = cells[0].replace(/^\\[/, '').trim();\n  const phoneMatch = line.match(/\\|\\s*(\\d{10})\\s*\\|/) || line.match(/\\b(\\d{10})\\b/);\n  if (phoneMatch) out.submitted_by_phone = phoneMatch[1];\n  const dt = line.match(/(\\d{1,2}\\/\\d{1,2}\\/\\d{4}(?:\\s+\\d{1,2}:\\d{2})?)/);\n  if (dt) out.date_submitted = normalizeDateTime(dt[1]);\n  return out;\n}\n\nfunction assessManualReview(parsed) {\n  const required = [\n    ['DOCUMENT_FORM_id', 'DOCUMENT_FORM_id'],\n    ['DOCUMENT_FORM_control_number', 'DOCUMENT_FORM_control_number'],\n    ['consumer_account_number', 'consumer_account_number'],\n    ['resident_name', 'resident_name'],\n    ['response_due_date', 'response_due_date'],\n  ];\n  const missing = required.filter(([key]) => !parsed[key]).map(([, label]) => label);\n  return {\n    manual_review_required: missing.length > 0,\n    manual_review_reason: missing.length\n      ? `Missing ${missing.join(', ')} after OCR.`\n      : null,\n  };\n}\n\nfunction parseDOCUMENT_SYSTEMDOCUMENT_FORMText(rawInput, meta = {}) {\n  const raw = String(rawInput || '');\n  const rawLines = raw\n    .replace(/\\r\\n/g, '\\n')\n    .replace(/\\r/g, '\\n')\n    .split('\\n')\n    .map((l) => l.replace(/[ \\t]+$/g, ''))\n    .filter((l) => l.trim().length > 0);\n\n  const normalizedLines = rawLines.map((l) => l.replace(/[ \\t]+/g, ' ').trim());\n\n  const header = extractHeaderIds(raw, rawLines);\n  const SOURCE_SYSTEMRow = extractSOURCE_SYSTEMRow(rawLines, normalizedLines);\n  const reviews = extractDisputeInfo(raw, rawLines, normalizedLines);\n  const customers = extractConsumerInfo(rawLines, normalizedLines);\n  const addresses = extractAddresses(rawLines, normalizedLines);\n  const account = extractAccountInfo(rawLines, normalizedLines);\n  const history = extractAccountHistory(rawLines, normalizedLines);\n  const submitted = extractSubmittedBy(rawLines, normalizedLines);\n\n  const parsed = {\n    ...header,\n    ...SOURCE_SYSTEMRow,\n    ...reviews,\n    ...customers,\n    ...addresses,\n    ...account,\n    ...history,\n    ...submitted,\n    account_number: SOURCE_SYSTEMRow.consumer_account_number,\n    consumer_name: customers.resident_name,\n    narrative: reviews.narrative_remarks,\n    source_file_name: meta.source_file_name || null,\n    source_sharepoint_file_id: meta.source_sharepoint_file_id || null,\n    raw_text: raw.slice(0, 8000),\n    rawLines,\n    normalizedLines,\n    parser_version: 'structured-v4.4-DOCUMENT_FORM-ocr',\n    parser_debug: {\n      consumer_info_block_used: customers._consumer_info_block_used || null,\n      account_number_raw: SOURCE_SYSTEMRow._account_number_raw || null,\n      account_number_normalized: SOURCE_SYSTEMRow._account_number_normalized || SOURCE_SYSTEMRow.consumer_account_number || null,\n      resident_name_parts: {\n        first_name: customers.first_name || null,\n        middle_name: customers.middle_name || null,\n        last_name: customers.last_name || null,\n      },\n      dispute_code_2_raw: reviews._dispute_code_2_raw || null,\n      response_code_raw: reviews._response_code_raw || reviews.response_code || null,\n      account_status_raw: account._account_status_raw || null,\n    },\n  };\n\n  delete parsed._consumer_info_block_used;\n  delete parsed._last_name_raw;\n  delete parsed._first_name_raw;\n  delete parsed._middle_name_raw;\n  delete parsed._account_number_raw;\n  delete parsed._account_number_normalized;\n  delete parsed._dispute_code_2_raw;\n  delete parsed._response_code_raw;\n  delete parsed._account_status_raw;\n\n  if (history.account_history_unreliable && history.account_history_raw) {\n    parsed.account_history_note = `Account history OCR unreliable; raw: ${history.account_history_raw}`;\n  }\n\n  const review = assessManualReview(parsed);\n  Object.assign(parsed, review);\n\n  return parsed;\n}\n\n\nconst raw = ($json.text || $json.raw_text || $json.body || $json.result || $json.data || '').toString();\nconst sourceFileName = $json.source_file_name || null;\nconst sourceSharePointId = $json.source_sharepoint_file_id || null;\nconst parsed = parseDOCUMENT_SYSTEMDOCUMENT_FORMText(raw, {\n  source_file_name: sourceFileName,\n  source_sharepoint_file_id: sourceSharePointId,\n});\ndelete parsed.rawLines;\ndelete parsed.normalizedLines;\nreturn [{ json: parsed }];"
+      },
+      "id": "SAMPLE_NODE_ID_013",
+      "name": "Parse DOCUMENT_SYSTEM Fields - Structured",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4368,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "sf-instance-url",
+              "name": "SF_INSTANCE_URL",
+              "value": "https://example.my.salesforce.com",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_014",
+      "name": "Set Salesforce Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -4144,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "parser-passed-manual-review-not-required",
+              "leftValue": "={{ $json.manual_review_required === false || String($json.manual_review_required).toLowerCase() === 'false' }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": true
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_015",
+      "name": "Validate Extraction",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -3920,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function esc(value) {\n  return String(value).replace(/'/g, \"\\\\'\");\n}\n\nconst item = $input.item.json;\nconst DOCUMENT_FORMId = item.DOCUMENT_FORM_id || item.DOCUMENT_SYSTEM_DOCUMENT_FORM_number || null;\nconst controlNumber = item.DOCUMENT_FORM_control_number || null;\nconst consumerAccount = item.consumer_account_number || item.account_number || null;\n\nconst conditions = [];\nif (DOCUMENT_FORMId) conditions.push(`Document_Form__c = '${esc(DOCUMENT_FORMId)}'`);\nif (controlNumber) conditions.push(`Document_Control_Number__c = '${esc(controlNumber)}'`);\nif (consumerAccount) conditions.push(`Customer_Account_Number__c = '${esc(consumerAccount)}'`);\n\nif (conditions.length === 0) {\n  return [{ json: { ...item, skip_duplicate_search: true } }];\n}\n\nconst soql = `SELECT Id, CaseNumber, Document_Form__c, Document_Control_Number__c, Customer_Account_Number__c FROM Case WHERE (${conditions.join(' OR ')}) ORDER BY CreatedDate DESC LIMIT 1`;\nreturn [{ json: { ...item, soql_query: soql, skip_duplicate_search: false } }];"
+      },
+      "id": "SAMPLE_NODE_ID_016",
+      "name": "Build Duplicate Search SOQL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3696,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.SF_INSTANCE_URL }}/services/data/v60.0/query",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "salesforceOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.soql_query }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "SAMPLE_NODE_ID_017",
+      "name": "Search Salesforce Duplicates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -3472,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.totalSize }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "rightValue": 0
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_018",
+      "name": "Duplicate Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -3248,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Parse DOCUMENT_SYSTEM Fields - Structured').item.json;\nconst sf = $('Set Salesforce Context').item.json;\nlet accountLookup = { records: [], totalSize: 0 };\ntry {\n  accountLookup = $('Search Salesforce Account').item.json || accountLookup;\n} catch (e) {\n  accountLookup = { records: [], totalSize: 0 };\n}\nconst matchedAccount = (accountLookup.records && accountLookup.records[0]) || null;\n\nfunction normalizeFieldConfig(config) {\n  if (typeof config === 'string') {\n    return { apiNames: [config], labelIncludes: [], allowMultipleMatches: false };\n  }\n  return {\n    apiNames: config.apiNames || [],\n    labelIncludes: (config.labelIncludes || []).map((s) => String(s).toLowerCase()),\n    allowMultipleMatches: Boolean(config.allowMultipleMatches),\n  };\n}\n\n// Parser key -> Salesforce Case field resolution config\nconst FIELD_MAP = {\n  DOCUMENT_FORM_id: 'Document_Form__c',\n  DOCUMENT_FORM_control_number: 'Document_Control_Number__c',\n  consumer_account_number: 'Customer_Account_Number__c',\n  subscriber_code: 'Provider_Code__c',\n  SOURCE_SYSTEM: 'Source_System__c',\n  ssn: 'Government_ID__c',\n  response_due_date: 'Response_Due_Date__c',\n  date_received: 'Date_Received__c',\n  response_date: 'Response_Date__c',\n  dispute_code_1: 'Review_Code_1__c',\n  dispute_code_2: 'Review_Code_2__c',\n  COMPLIANCE_relevant_information: 'Compliance_Notes__c',\n  narrative_remarks: 'Narrative_Remarks__c',\n  resident_name: 'Customer_Name__c',\n  first_name: 'First_Name__c',\n  middle_name: 'Middle_Name__c',\n  last_name: 'Last_Name__c',\n  date_of_birth: 'Date_of_Birth__c',\n  phone: 'Customer_Phone__c',\n  tenant_address: 'Customer_Address__c',\n  previous_address: 'Previous_Address__c',\n  second_previous_address: 'Second_Previous_Address__c',\n  response_account_status: 'Response_Account_Status__c',\n  account_type: 'Account_Type__c',\n  current_balance: 'Current_Balance__c',\n  past_due_balance: 'Outstanding_Balance__c',\n  highest_credit_limit: 'Highest_Credit_Limit__c',\n  actual_payment_amount: 'Actual_Payment_Amount__c',\n  date_opened: 'Date_Opened__c',\n  date_of_account_information: 'Date_of_Account_Information__c',\n  date_of_last_payment: 'Date_of_Last_Payment__c',\n  account_closed_date: 'Account_Closed_Date__c',\n  account_history: 'Historical_Review__c',\n  date_first_delinquency: {\n    apiNames: [\n      'First_Event_Date__c',\n      'First_Event_Date__c',\n      'First_Event_Date__c',\n      'Compliance_First_Event_Date__c',\n      'Compliance_First_Event_Date__c',\n    ],\n    labelIncludes: [\n      'date of first deliquent',\n      'date of first delinquent',\n      'COMPLIANCE 1st date of delinquency',\n      'first date of delinquency',\n    ],\n  },\n  RELATIONSHIP_code: {\n    apiNames: [\n      'Relationship_Code__c',\n      'Relationship_Type__c',\n      'Relationship_Status__c',\n      'Customer_Relationship_Code__c',\n    ],\n    labelIncludes: ['RELATIONSHIP code', 'RELATIONSHIP'],\n  },\n  account_status: {\n    apiNames: [\n      'Account_Status__c',\n      'Current_Account_Status__c',\n      'Current_Account_Status_from_Form__c',\n      'Current_Account_Status_Form__c',\n      'Account_Current_Status__c',\n      'Current_Status__c',\n    ],\n    labelIncludes: ['account status', 'current account status'],\n    allowMultipleMatches: true,\n  },\n  response_code: {\n    apiNames: ['Response_Code__c'],\n    labelIncludes: ['response code'],\n  },\n};\n\nconst DESCRIPTION_LABELS = {\n  DOCUMENT_FORM_id: 'DOCUMENT_SYSTEM DOCUMENT_FORM #',\n  DOCUMENT_FORM_control_number: 'DOCUMENT_FORM Control Number',\n  consumer_account_number: 'customers Account Number',\n  subscriber_code: 'providers Code',\n  SOURCE_SYSTEM: 'SOURCE_SYSTEM',\n  RELATIONSHIP_code: 'RELATIONSHIP Code',\n  ssn: 'SSN',\n  response_code: 'Response Code',\n  response_due_date: 'Response Due Date',\n  date_received: 'Date Received',\n  response_date: 'Response Date',\n  dispute_code_1: 'reviews Code 1',\n  dispute_code_2: 'reviews Code 2',\n  COMPLIANCE_relevant_information: 'COMPLIANCE Relevant Information',\n  narrative_remarks: 'Narrative Remarks',\n  resident_name: 'customers Name',\n  first_name: 'First Name',\n  middle_name: 'Middle Name',\n  last_name: 'Last Name',\n  date_of_birth: 'Date of Birth',\n  phone: 'Telephone Number',\n  tenant_address: 'customers Address',\n  previous_address: 'Previous Address',\n  second_previous_address: 'Second Previous Address',\n  account_status: 'Account Status',\n  response_account_status: 'Response Account Status',\n  account_type: 'Account Type',\n  current_balance: 'Current Balance',\n  past_due_balance: 'Past Due Balance',\n  highest_credit_limit: 'Highest Credit Limit',\n  actual_payment_amount: 'Actual Payment Amount',\n  date_opened: 'Date Opened',\n  date_of_account_information: 'Date of Account Information',\n  date_of_last_payment: 'Date of Last Payment',\n  account_closed_date: 'Account Closed Date',\n  date_first_delinquency: 'COMPLIANCE 1st Date of Delinquency',\n  account_history: 'Account History',\n  portfolio_type: 'Portfolio Type',\n  terms_frequency: 'Terms Frequency',\n  image_count: 'Image Count',\n  submitted_by: 'Submitted By',\n  submitted_by_phone: 'Submitted By Phone',\n  date_submitted: 'Date Submitted',\n};\n\nconst STATIC_CASE_FIELDS = {\n  Case_Type__c: 'DOCUMENT_SYSTEM reviews',\n};\n\nconst CONFIRMED_CASE_FIELDS = new Set([\n  'Case_Type__c',\n  'Document_Form__c',\n  'Customer_Account_Number__c',\n  'Provider_Code__c',\n  'Customer_Name__c',\n  'First_Name__c',\n  'Last_Name__c',\n  'Review_Code_1__c',\n  'Review_Code_2__c',\n  'Customer_Address__c',\n  'Account_Status__c',\n  'Current_Account_Status__c',\n  'Current_Account_Status_Form__c',\n  'Current_Balance__c',\n  'Outstanding_Balance__c',\n  'Response_Due_Date__c',\n  'Date_Opened__c',\n  'Date_of_Last_Payment__c',\n  'Date_of_Account_Information__c',\n  'First_Event_Date__c',\n  'Relationship_Code__c',\n  'Response_Code__c',\n  'Last_Processed_File_Id__c',\n  'Document_Processed_At__c',\n]);\n\nfunction getParserValue(data, parserKey) {\n  if (parserKey === 'DOCUMENT_FORM_id') return data.DOCUMENT_FORM_id || data.DOCUMENT_SYSTEM_DOCUMENT_FORM_number || null;\n  if (parserKey === 'consumer_account_number') return data.consumer_account_number || data.account_number || null;\n  if (parserKey === 'narrative_remarks') return data.narrative_remarks ?? data.narrative ?? null;\n  return data[parserKey] ?? null;\n}\n\nfunction buildFieldContext() {\n  const available = new Set(['Subject', 'Status', 'Origin', 'Priority', 'Description', 'AccountId']);\n  const describeFields = [];\n  let source = 'confirmed_fallback';\n\n  try {\n    const describe = $('Describe Salesforce Case Fields').item.json;\n    if (describe && Array.isArray(describe.fields)) {\n      source = 'describe';\n      for (const field of describe.fields) {\n        if (field.createable === false) continue;\n        available.add(field.name);\n        describeFields.push({\n          name: field.name,\n          label: String(field.label || '').toLowerCase(),\n        });\n      }\n      return { available, describeFields, source };\n    }\n  } catch (e) {\n    // fall through\n  }\n\n  for (const name of CONFIRMED_CASE_FIELDS) available.add(name);\n  return { available, describeFields, source };\n}\n\nfunction resolveSalesforceFields(parserKey, config, available, describeFields) {\n  const { apiNames, labelIncludes, allowMultipleMatches } = config;\n  const matches = [];\n  const seen = new Set();\n\n  for (const apiName of apiNames) {\n    if (!available.has(apiName) || seen.has(apiName)) continue;\n    matches.push(apiName);\n    seen.add(apiName);\n    if (!allowMultipleMatches) return matches;\n  }\n\n  for (const field of describeFields) {\n    if (!available.has(field.name) || seen.has(field.name)) continue;\n    if (!labelIncludes.some((needle) => field.label.includes(needle))) continue;\n    matches.push(field.name);\n    seen.add(field.name);\n    if (!allowMultipleMatches) return matches;\n  }\n\n  return matches;\n}\n\nconst { available: availableCaseFields, describeFields, source: fieldValidationSource } = buildFieldContext();\n\nconst consumerAccount = getParserValue(parsed, 'consumer_account_number');\nconst DOCUMENT_FORMId = getParserValue(parsed, 'DOCUMENT_FORM_id');\nconst now = new Date().toISOString();\n\nconst descriptionLines = [\n  'DOCUMENT_SYSTEM PDF Processed',\n  `Source File: ${parsed.source_file_name || ''}`,\n  `Parser Version: ${parsed.parser_version || ''}`,\n  `Field validation: ${fieldValidationSource}`,\n  '',\n  'Parsed PDF Values:',\n];\n\nfor (const key of Object.keys(DESCRIPTION_LABELS)) {\n  const value = getParserValue(parsed, key);\n  if (value != null && value !== '') {\n    descriptionLines.push(`${DESCRIPTION_LABELS[key]}: ${value}`);\n  }\n}\n\nif (parsed.account_history_note) {\n  descriptionLines.push(`Account History Note: ${parsed.account_history_note}`);\n}\n\nconst mappedFields = [];\nconst skippedFields = [];\n\nfor (const [parserKey, rawConfig] of Object.entries(FIELD_MAP)) {\n  const value = getParserValue(parsed, parserKey);\n  if (value == null || value === '') continue;\n\n  const config = normalizeFieldConfig(rawConfig);\n  const sfFields = resolveSalesforceFields(parserKey, config, availableCaseFields, describeFields);\n\n  if (sfFields.length) {\n    for (const sfField of sfFields) {\n      mappedFields.push({ parserKey, sfField, value });\n    }\n  } else {\n    skippedFields.push({\n      parserKey,\n      sfField: config.apiNames[0] || parserKey,\n      value,\n    });\n  }\n}\n\nif (skippedFields.length) {\n  descriptionLines.push('', 'Not mapped to Salesforce (field API unavailable on Case):');\n  for (const item of skippedFields) {\n    descriptionLines.push(\n      `${DESCRIPTION_LABELS[item.parserKey] || item.parserKey} [parser:${item.parserKey} -> SF:${item.sfField}]: ${item.value}`\n    );\n  }\n}\n\nif (matchedAccount && matchedAccount.Id) {\n  descriptionLines.push('', `Account lookup: Matched Account Id ${matchedAccount.Id} (${matchedAccount.Name || 'unnamed'})`);\n} else if (consumerAccount) {\n  descriptionLines.push('', `Account lookup: No matching Account found for ${consumerAccount}.`);\n}\n\nconst case_body = {\n  Subject: `DOCUMENT_SYSTEM reviews - ${consumerAccount || DOCUMENT_FORMId || parsed.source_file_name || 'Unknown'}`,\n  Status: 'New',\n  Origin: 'Web',\n  Priority: 'Medium',\n  Description: descriptionLines.join('\\n'),\n};\n\nfor (const [sfField, staticValue] of Object.entries(STATIC_CASE_FIELDS)) {\n  if (availableCaseFields.has(sfField)) case_body[sfField] = staticValue;\n}\n\nif (availableCaseFields.has('Last_Processed_File_Id__c') && parsed.source_sharepoint_file_id) {\n  case_body.Last_Processed_File_Id__c = parsed.source_sharepoint_file_id;\n}\nif (availableCaseFields.has('Document_Processed_At__c')) {\n  case_body.Document_Processed_At__c = now;\n}\n\nfor (const { sfField, value } of mappedFields) {\n  case_body[sfField] = value;\n}\n\nif (matchedAccount && matchedAccount.Id) {\n  case_body.AccountId = matchedAccount.Id;\n}\n\nreturn [{\n  json: {\n    SF_INSTANCE_URL: sf.SF_INSTANCE_URL,\n    case_body,\n    field_validation_source: fieldValidationSource,\n    mapped_field_count: mappedFields.length,\n    skipped_field_count: skippedFields.length,\n    skipped_fields: skippedFields,\n    mapped_fields: mappedFields,\n    case_body_preview: case_body,\n    account_lookup_matched: Boolean(matchedAccount && matchedAccount.Id),\n    account_lookup_id: matchedAccount ? matchedAccount.Id : null,\n  }\n}];"
+      },
+      "id": "SAMPLE_NODE_ID_019",
+      "name": "Build DOCUMENT_SYSTEM Case Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2352,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.SF_INSTANCE_URL }}/services/data/v60.0/sobjects/Case/",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "salesforceOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.case_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "SAMPLE_NODE_ID_020",
+      "name": "Create Salesforce Case REST",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2128,
+        320
+      ],
+      "notes": "Creates DOCUMENT_SYSTEM Salesforce Cases in production after duplicate and idempotency checks pass."
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Parse DOCUMENT_SYSTEM Fields - Structured').item.json;\nconst dup = $('Search Salesforce Duplicates').item.json;\nconst existing = (dup.records && dup.records[0]) || {};\n\nreturn [{\n  json: {\n    duplicate_found: true,\n    action: 'stop',\n    message: 'Duplicate Salesforce Case found. No new Case created.',\n    existing_case_id: existing.Id || null,\n    existing_case_number: existing.CaseNumber || null,\n    existing_DOCUMENT_SYSTEM_DOCUMENT_FORM: existing.Document_Form__c || null,\n    existing_DOCUMENT_FORM_control_number: existing.Document_Control_Number__c || null,\n    existing_account_number: existing.Customer_Account_Number__c || null,\n    source_file_name: parsed.source_file_name || null,\n    source_sharepoint_file_id: parsed.source_sharepoint_file_id || null,\n    DOCUMENT_FORM_id: parsed.DOCUMENT_FORM_id || parsed.DOCUMENT_SYSTEM_DOCUMENT_FORM_number || null,\n    DOCUMENT_FORM_control_number: parsed.DOCUMENT_FORM_control_number || null,\n    consumer_account_number: parsed.consumer_account_number || parsed.account_number || null\n  }\n}];"
+      },
+      "id": "SAMPLE_NODE_ID_021",
+      "name": "Duplicate Review - Stop",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Parse DOCUMENT_SYSTEM Fields - Structured').item.json;\nconst sf = $('Set Salesforce Context').item.json;\nconst reason = parsed.manual_review_reason || 'Missing required identifiers after OCR.';\n\nreturn [{\n  json: {\n    SF_INSTANCE_URL: sf.SF_INSTANCE_URL,\n    case_body: {\n      Subject: `DOCUMENT_SYSTEM Manual Review - ${parsed.source_file_name || 'Unknown'}`,\n      Status: 'New',\n      Origin: 'Web',\n      Priority: 'High',\n      Case_Type__c: 'DOCUMENT_SYSTEM reviews',\n      Description: [\n        'Manual Review Required',\n        `Reason: ${reason}`,\n        `Source File: ${parsed.source_file_name || ''}`,\n        `SharePoint File ID: ${parsed.source_sharepoint_file_id || ''}`,\n        `Parser Version: ${parsed.parser_version || ''}`,\n        '',\n        'Partial Parsed Values:',\n        `DOCUMENT_FORM ID: ${parsed.DOCUMENT_FORM_id || ''}`,\n        `DOCUMENT_FORM Control Number: ${parsed.DOCUMENT_FORM_control_number || ''}`,\n        `customers Account Number: ${parsed.consumer_account_number || parsed.account_number || ''}`,\n        `customers Name: ${parsed.resident_name || ''}`,\n        `Response Due Date: ${parsed.response_due_date || ''}`,\n        '',\n        'Raw Text Preview:',\n        parsed.raw_text || ''\n      ].join('\\n')\n    }\n  }\n}];"
+      },
+      "id": "SAMPLE_NODE_ID_022",
+      "name": "Build Manual Review Case Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -336,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const norm = $('Normalize PDF.co OCR Job Status').item.json;\nconst source = $('Set PDF.co Uploaded URL').item.json;\n\nreturn [{ json: {\n  stopped: true,\n  reason: `PDF.co OCR job was not complete or did not return a result URL after ${norm.pdfco_attempt || 0} check(s). Parser and Salesforce Case creation were intentionally skipped.`,\n  pdfco_status: norm.pdfco_job_status || norm.status || null,\n  pdfco_message: norm.message || norm.error || null,\n  pdfco_job_id: norm.pdfco_job_id || null,\n  pdfco_attempt: norm.pdfco_attempt || null,\n  source_file_name: source.source_file_name || null,\n  source_sharepoint_file_id: source.source_sharepoint_file_id || null\n} }];"
+      },
+      "id": "SAMPLE_NODE_ID_023",
+      "name": "PDF.co OCR Not Ready - Stop",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4592,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "placeholder-webhook-id",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_024",
+      "name": "SharePoint Upload Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -8848,
+        672
+      ],
+      "notes": "Production webhook: https://example.com/webhook-placeholder — POST file metadata from Power Automate when a PDF is uploaded to the DOCUMENT_SYSTEM SharePoint folder. If import does not activate the workflow automatically, toggle Active on manually after import."
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst raw = items[0]?.json || {};\nconst body = raw.body ?? raw;\n\nfunction pick(obj, ...keys) {\n  for (const k of keys) {\n    const v = obj[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return v;\n  }\n  return null;\n}\n\nconst sharepointIdentifier = pick(body, 'Identifier', 'identifier', 'FileIdentifier', 'fileIdentifier', 'file_identifier', 'fileId', 'file_id', 'Id', 'id');\nconst fileName = pick(body, 'fileName', 'file_name', 'Name', 'name', 'FilenameWithExtension', 'FileNameWithExtension', 'DisplayName', 'displayName');\nconst webUrl = pick(body, 'webUrl', 'web_url', 'WebUrl', 'Link', 'link', 'Path', 'path');\nconst siteId = pick(body, 'siteId', 'site_id') || 'SAMPLE_CHANNEL_ID';\nconst parentFolderId = pick(body, 'parentFolderId', 'parent_folder_id', 'parentId', 'parent_id') || 'SAMPLE_CHANNEL_ID';\nconst driveId = pick(body, 'driveId', 'drive_id');\n\nif (!sharepointIdentifier) {\n  return [{\n    json: {\n      ok: false,\n      action: 'skipped',\n      reason: 'missing_file_id',\n      message: 'Missing SharePoint identifier in webhook payload.',\n      source_file_name: fileName,\n      source_sharepoint_file_id: null,\n      _stop: true\n    }\n  }];\n}\n\nconst nameLower = String(fileName || '').toLowerCase();\nif (!nameLower.endsWith('.pdf')) {\n  return [{\n    json: {\n      ok: true,\n      action: 'skipped',\n      reason: 'non_pdf',\n      message: 'File is not a PDF; processing skipped.',\n      source_file_name: fileName,\n      source_sharepoint_file_id: sharepointIdentifier,\n      _stop: true\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    sharepointIdentifier,\n    fileName: fileName || 'sample-document.pdf',\n    siteId,\n    driveId,\n    parentFolderId,\n    webUrl,\n    fileId: sharepointIdentifier,\n    _stop: false\n  }\n}];"
+      },
+      "id": "SAMPLE_NODE_ID_025",
+      "name": "Normalize SharePoint Upload Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -8624,
+        672
+      ],
+      "notes": "Normalizes Power Automate / SharePoint webhook payloads and validates PDF + file ID before processing."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid-upload-payload",
+              "leftValue": "={{ $json._stop }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              },
+              "rightValue": true
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_026",
+      "name": "Valid Upload Payload?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -8400,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "sf-instance-url-idemp",
+              "name": "SF_INSTANCE_URL",
+              "value": "https://example.my.salesforce.com",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_027",
+      "name": "Set Salesforce Context For Idempotency",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -8176,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function esc(value) {\n  return String(value).replace(/'/g, \"\\\\'\");\n}\n\nconst item = $input.item.json;\nconst sharepointId = item.sharepointIdentifier || item.fileId;\nconst soql = `SELECT Id, CaseNumber, Last_Processed_File_Id__c FROM Case WHERE Last_Processed_File_Id__c = '${esc(sharepointId)}' ORDER BY CreatedDate DESC LIMIT 1`;\n\nreturn [{ json: { ...item, file_idempotency_soql: soql } }];"
+      },
+      "id": "SAMPLE_NODE_ID_028",
+      "name": "Build File ID Idempotency SOQL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7952,
+        176
+      ],
+      "notes": "Prevents duplicate Case creation when Power Automate retries the same SharePoint file ID."
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.SF_INSTANCE_URL }}/services/data/v60.0/query",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "salesforceOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.file_idempotency_soql }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "SAMPLE_NODE_ID_029",
+      "name": "Search Salesforce By File ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -7728,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "file-already-processed",
+              "leftValue": "={{ $json.totalSize }}",
+              "operator": {
+                "type": "number",
+                "operation": "larger"
+              },
+              "rightValue": 0
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_030",
+      "name": "File Already Processed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -7504,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const normalized = $('Normalize SharePoint Upload Payload').item.json;\nconst sf = $input.item.json;\nconst existing = (sf.records && sf.records[0]) || {};\n\nreturn [{\n  json: {\n    ok: true,\n    action: 'already_processed',\n    reason: 'SharePoint file ID already has a Salesforce Case.',\n    source_file_name: normalized.fileName,\n    source_sharepoint_file_id: normalized.sharepointIdentifier || normalized.fileId,\n    salesforce_case_id: existing.Id || null,\n    duplicate_case_number: existing.CaseNumber || null\n  }\n}];"
+      },
+      "id": "SAMPLE_NODE_ID_031",
+      "name": "Already Processed - Stop",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const normalized = $('Normalize SharePoint Upload Payload').item.json;\nconst created = $('Create Salesforce Case REST').item.json;\nconst sfFile = $('Upload DOCUMENT_SYSTEM PDF to Salesforce Case').item.json;\nconst contentVersion = $('Get Uploaded Salesforce ContentVersion').item.json.records?.[0] || {};\n\nfunction getNodeJson(name) {\n  try {\n    return $(name).item.json;\n  } catch (e) {\n    return null;\n  }\n}\n\nconst sourceDelete = getNodeJson('PDF.co Delete Uploaded Source File');\nconst ocrDelete = getNodeJson('PDF.co Delete OCR Output File');\nconst ocrCleanupBody = getNodeJson('Build PDF.co Cleanup Body - OCR Output');\n\nfunction deleteOk(result) {\n  if (!result) return null;\n  if (result.error === false) return true;\n  if (String(result.status || '') === '200') return true;\n  if (result.error) return false;\n  return null;\n}\n\nreturn [{\n  json: {\n    ok: true,\n    action: 'created',\n    source_file_name: normalized.fileName,\n    source_sharepoint_file_id: normalized.sharepointIdentifier || normalized.fileId,\n    salesforce_case_id: created.id || created.Id || null,\n    salesforce_file_content_version_id: sfFile.id || sfFile.Id || null,\n    salesforce_file_content_document_id: contentVersion.ContentDocumentId || null,\n    salesforce_file_link_verified: Boolean(contentVersion.ContentDocumentId),\n    salesforce_file_should_show_under_case_files: Boolean(contentVersion.ContentDocumentId),\n    salesforce_file_uploaded: Boolean(sfFile.id || sfFile.Id),\n    pdfco_cleanup: {\n      uploaded_source_delete_attempted: true,\n      uploaded_source_delete_ok: deleteOk(sourceDelete),\n      ocr_output_delete_attempted: Boolean(ocrCleanupBody && ocrCleanupBody.has_pdfco_ocr_output_url),\n      ocr_output_delete_ok: deleteOk(ocrDelete)\n    }\n  }\n}];"
+      },
+      "id": "SAMPLE_NODE_ID_032",
+      "name": "Format Success Webhook Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const stop = $input.item.json;\nreturn [{\n  json: {\n    ok: true,\n    action: 'duplicate',\n    source_file_name: stop.source_file_name || null,\n    source_sharepoint_file_id: stop.source_sharepoint_file_id || null,\n    salesforce_case_id: stop.existing_case_id || null,\n    duplicate_case_number: stop.existing_case_number || null,\n    reason: stop.message || 'Duplicate Salesforce Case found.'\n  }\n}];"
+      },
+      "id": "SAMPLE_NODE_ID_033",
+      "name": "Format Duplicate Webhook Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Parse DOCUMENT_SYSTEM Fields - Structured').item.json;\nconst created = $('Create Manual Review Salesforce Case').item.json;\nreturn [{\n  json: {\n    ok: true,\n    action: 'manual_review',\n    source_file_name: parsed.source_file_name || null,\n    source_sharepoint_file_id: parsed.source_sharepoint_file_id || null,\n    salesforce_case_id: created.id || created.Id || null,\n    reason: parsed.manual_review_reason || 'Missing required identifiers after OCR.'\n  }\n}];"
+      },
+      "id": "SAMPLE_NODE_ID_034",
+      "name": "Format Manual Review Webhook Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const stop = $input.item.json;\nreturn [{\n  json: {\n    ok: false,\n    action: 'error',\n    source_file_name: stop.source_file_name || null,\n    source_sharepoint_file_id: stop.source_sharepoint_file_id || null,\n    reason: stop.reason || 'PDF.co OCR job was not complete.'\n  }\n}];"
+      },
+      "id": "SAMPLE_NODE_ID_035",
+      "name": "Format OCR Error Webhook Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4368,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "SAMPLE_NODE_ID_036",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        336,
+        576
+      ],
+      "notes": "Final webhook response for success, duplicate, skipped, already-processed, manual-review, and OCR-error branches."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_037",
+      "name": "Merge Case With Original PDF",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -1904,
+        240
+      ],
+      "notes": "Combines the successful Salesforce Case create response with the original PDF binary downloaded from SharePoint so the same PDF can be attached to the Case."
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item;\nconst created = item.json || {};\nconst normalized = $('Normalize SharePoint Upload Payload').item.json;\nconst sf = $('Set Salesforce Context').item.json;\nconst pdfcoSource = $('Set PDF.co Uploaded URL').item.json;\nconst ocrJob = $('PDF.co Check OCR Job').item.json;\n\nconst caseId = created.id || created.Id || created.salesforce_case_id;\nif (!caseId) {\n  throw new Error('Missing Salesforce Case Id from Create Salesforce Case REST. Refusing to upload Salesforce File or delete PDF.co temp file.');\n}\n\nif (!item.binary || !item.binary.data) {\n  throw new Error('Missing original PDF binary from Download PDF from SharePoint. Check Merge Case With Original PDF input 1.');\n}\n\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nif (!buffer || buffer.length === 0) {\n  throw new Error('Original PDF binary buffer is empty. Refusing to upload blank file to Salesforce.');\n}\n\nconst fileName = normalized.fileName || 'sample-document.pdf';\nconst title = fileName.replace(/\\.pdf$/i, '') || 'DOCUMENT_SYSTEM Document';\n\nreturn [{\n  json: {\n    SF_INSTANCE_URL: sf.SF_INSTANCE_URL,\n    salesforce_case_id: caseId,\n    source_file_name: fileName,\n    source_sharepoint_file_id: normalized.sharepointIdentifier || normalized.fileId || null,\n    pdfco_uploaded_pdf_url: pdfcoSource.uploaded_pdf_url || pdfcoSource.url || null,\n    pdfco_ocr_output_url: ocrJob.url || null,\n    content_version_body: {\n      Title: title,\n      PathOnClient: fileName,\n      FirstPublishLocationId: caseId,\n      VersionData: buffer.toString('base64')\n    }\n  }\n}];"
+      },
+      "id": "SAMPLE_NODE_ID_038",
+      "name": "Prepare Salesforce Case File Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1680,
+        240
+      ],
+      "notes": "Builds ContentVersion payload from the original SharePoint PDF binary. FirstPublishLocationId links the file directly to the newly created Case."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.SF_INSTANCE_URL }}/services/data/v60.0/sobjects/ContentVersion",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "salesforceOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.content_version_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "SAMPLE_NODE_ID_039",
+      "name": "Upload DOCUMENT_SYSTEM PDF to Salesforce Case",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1456,
+        240
+      ],
+      "notes": "Creates a Salesforce File (ContentVersion) and attaches it to the new Case using FirstPublishLocationId."
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Prepare Salesforce Case File Upload').item.json.SF_INSTANCE_URL }}/services/data/v60.0/query",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "salesforceOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ \"SELECT Id, ContentDocumentId, Title FROM ContentVersion WHERE Id = '\" + ($('Upload DOCUMENT_SYSTEM PDF to Salesforce Case').item.json.id || $('Upload DOCUMENT_SYSTEM PDF to Salesforce Case').item.json.Id) + \"' LIMIT 1\" }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "SAMPLE_NODE_ID_040",
+      "name": "Get Uploaded Salesforce ContentVersion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1232,
+        240
+      ],
+      "notes": "Fetches ContentDocumentId for the uploaded ContentVersion. FirstPublishLocationId already links the file to the Case."
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $('Set PDF.co Uploaded URL').item.json;\nconst created = $('Create Salesforce Case REST').item.json;\nconst sfFile = $('Upload DOCUMENT_SYSTEM PDF to Salesforce Case').item.json;\n\nconst url = source.uploaded_pdf_url || source.url;\nif (!url) {\n  throw new Error('Missing PDF.co uploaded PDF URL. Refusing to run cleanup without a target URL.');\n}\n\nreturn [{\n  json: {\n    url,\n    cleanup_target: 'pdfco_uploaded_source_pdf',\n    salesforce_case_id: created.id || created.Id || null,\n    salesforce_content_version_id: sfFile.id || sfFile.Id || null\n  }\n}];"
+      },
+      "id": "SAMPLE_NODE_ID_041",
+      "name": "Build PDF.co Cleanup Body - Uploaded PDF",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1008,
+        240
+      ],
+      "notes": "Builds the PDF.co /v1/file/delete payload for the uploaded source PDF. Runs only after Salesforce Case File upload succeeds."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.pdf.co/v1/file/delete",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "REPLACE_WITH_ENVIRONMENT_VARIABLE"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { url: $json.url } }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "SAMPLE_NODE_ID_042",
+      "name": "PDF.co Delete Uploaded Source File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -784,
+        240
+      ],
+      "continueOnFail": true,
+      "notes": "Force-deletes the temporary PDF.co source PDF after Salesforce ContentVersion upload and Case file-link verification succeed. ContinueOnFail prevents cleanup failure from hiding the created Case/File."
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $('Set PDF.co Uploaded URL').item.json;\nconst ocrJob = $('PDF.co Check OCR Job').item.json;\nconst created = $('Create Salesforce Case REST').item.json;\nconst sfFile = $('Upload DOCUMENT_SYSTEM PDF to Salesforce Case').item.json;\n\nconst uploadedUrl = source.uploaded_pdf_url || source.url || null;\nconst outputUrl = ocrJob.url || null;\n\nreturn [{\n  json: {\n    url: outputUrl,\n    has_pdfco_ocr_output_url: Boolean(outputUrl && outputUrl !== uploadedUrl),\n    cleanup_target: 'pdfco_ocr_text_output',\n    salesforce_case_id: created.id || created.Id || null,\n    salesforce_content_version_id: sfFile.id || sfFile.Id || null\n  }\n}];"
+      },
+      "id": "SAMPLE_NODE_ID_043",
+      "name": "Build PDF.co Cleanup Body - OCR Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        240
+      ],
+      "notes": "Builds optional cleanup payload for the OCR text output URL returned by PDF.co job/check."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ocr-output-url-present",
+              "leftValue": "={{ $json.has_pdfco_ocr_output_url }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "rightValue": true
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_044",
+      "name": "OCR Output URL Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -336,
+        240
+      ],
+      "notes": "Only attempts OCR output cleanup when PDF.co returned a separate output URL."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.pdf.co/v1/file/delete",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "REPLACE_WITH_ENVIRONMENT_VARIABLE"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { url: $json.url } }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "SAMPLE_NODE_ID_045",
+      "name": "PDF.co Delete OCR Output File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -112,
+        176
+      ],
+      "continueOnFail": true,
+      "notes": "Best-effort force-delete for the temporary OCR text output generated by PDF.co."
+    },
+    {
+      "parameters": {
+        "jsCode": "function esc(value) {\n  return String(value).replace(/'/g, \"\\\\'\");\n}\n\nconst parsed = $('Parse DOCUMENT_SYSTEM Fields - Structured').item.json;\nconst sf = $('Set Salesforce Context').item.json;\nconst consumerAccount = parsed.consumer_account_number || parsed.account_number || null;\n\nif (!consumerAccount) {\n  return [{\n    json: {\n      ...parsed,\n      SF_INSTANCE_URL: sf.SF_INSTANCE_URL,\n      skip_account_lookup: true,\n      account_lookup_soql: \"SELECT Id, Name, Customer_Account_Number__c FROM Account WHERE Id = '000000000000000AAA'\",\n      account_lookup_note: 'No consumer_account_number available for Account lookup.'\n    }\n  }];\n}\n\n// Account lookup uses Customer_Account_Number__c (same customers-number field family as Case.Customer_Account_Number__c).\nconst soql = `SELECT Id, Name, Customer_Account_Number__c FROM Account WHERE Customer_Account_Number__c = '${esc(consumerAccount)}' LIMIT 1`;\nreturn [{\n  json: {\n    ...parsed,\n    SF_INSTANCE_URL: sf.SF_INSTANCE_URL,\n    skip_account_lookup: false,\n    account_lookup_soql: soql,\n    account_lookup_consumer_number: consumerAccount\n  }\n}];"
+      },
+      "id": "SAMPLE_NODE_ID_046",
+      "name": "Build Account Lookup SOQL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3024,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.SF_INSTANCE_URL }}/services/data/v60.0/query",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "salesforceOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.account_lookup_soql }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "SAMPLE_NODE_ID_047",
+      "name": "Search Salesforce Account",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2800,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.SF_INSTANCE_URL }}/services/data/v60.0/sobjects/Case/",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "salesforceOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.case_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "SAMPLE_NODE_ID_048",
+      "name": "Create Manual Review Salesforce Case",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -112,
+        672
+      ],
+      "notes": "Creates high-priority manual review Cases when required parser fields are missing."
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Build Account Lookup SOQL').item.json.SF_INSTANCE_URL }}/services/data/v60.0/sobjects/Case/describe",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "salesforceOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "SAMPLE_NODE_ID_049",
+      "name": "Describe Salesforce Case Fields",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2576,
+        320
+      ],
+      "continueOnFail": true,
+      "notes": "Loads createable Case field API names so Build DOCUMENT_SYSTEM Case Body only sends fields that exist."
+    },
+    {
+      "parameters": {
+        "jsCode": "const check = $input.item.json;\nconst status = String(check.status || '').toLowerCase().trim();\nconst url = check.url || check.resultUrl || check.result || null;\nconst jobId = check.jobId || ($('PDF.co OCR PDF to Text').item.json || {}).jobId || null;\n\nlet attempt = 1;\ntry {\n  const retryWait = $('Wait for PDF.co OCR Retry').item.json;\n  if (retryWait && retryWait.pdfco_attempt != null) {\n    attempt = Number(retryWait.pdfco_attempt) + 1;\n  }\n} catch (e) {}\n\nconst hasUrl = Boolean(url && String(url).trim());\nconst failedStatuses = new Set(['failed', 'error', 'aborted']);\nconst processingStatuses = new Set(['working', 'processing', 'pending', 'created', '']);\n\nconst pdfco_is_success = status === 'success' && hasUrl;\nlet pdfco_is_failed = failedStatuses.has(status);\nlet pdfco_is_still_processing = false;\n\nif (!pdfco_is_success && !pdfco_is_failed && attempt < 5) {\n  pdfco_is_still_processing = processingStatuses.has(status) || !failedStatuses.has(status);\n}\n\nif (attempt >= 5 && !pdfco_is_success) {\n  pdfco_is_failed = true;\n  pdfco_is_still_processing = false;\n}\n\nreturn [{\n  json: {\n    ...check,\n    pdfco_job_status: check.status || null,\n    pdfco_result_url: hasUrl ? url : null,\n    pdfco_job_id: jobId,\n    pdfco_attempt: attempt,\n    pdfco_is_success,\n    pdfco_is_still_processing,\n    pdfco_is_failed,\n  },\n}];"
+      },
+      "id": "SAMPLE_NODE_ID_050",
+      "name": "Normalize PDF.co OCR Job Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5264,
+        608
+      ],
+      "notes": "Normalizes PDF.co job/check response and tracks retry attempt (max 5 checks)."
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "id": "SAMPLE_NODE_ID_051",
+      "name": "Wait for PDF.co OCR Retry",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -4592,
+        800
+      ],
+      "notes": "Waits 30 seconds between PDF.co OCR job status re-checks (up to 5 total checks)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ocr-still-processing",
+              "leftValue": "={{ $json.pdfco_is_still_processing === true || String($json.pdfco_is_still_processing).toLowerCase() === 'true' }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": true
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_052",
+      "name": "OCR Still Processing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -4816,
+        800
+      ],
+      "notes": "Routes in-progress PDF.co OCR jobs to retry wait/check instead of immediate stop."
+    }
+  ],
+  "connections": {
+    "SharePoint Upload Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize SharePoint Upload Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize SharePoint Upload Payload": {
+      "main": [
+        [
+          {
+            "node": "Valid Upload Payload?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Upload Payload?": {
+      "main": [
+        [
+          {
+            "node": "Set Salesforce Context For Idempotency",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Salesforce Context For Idempotency": {
+      "main": [
+        [
+          {
+            "node": "Build File ID Idempotency SOQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build File ID Idempotency SOQL": {
+      "main": [
+        [
+          {
+            "node": "Search Salesforce By File ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Salesforce By File ID": {
+      "main": [
+        [
+          {
+            "node": "File Already Processed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File Already Processed?": {
+      "main": [
+        [
+          {
+            "node": "Already Processed - Stop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Restore Upload Payload for Download",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Upload Payload for Download": {
+      "main": [
+        [
+          {
+            "node": "Download PDF from SharePoint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already Processed - Stop": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download PDF from SharePoint": {
+      "main": [
+        [
+          {
+            "node": "PDF.co Get Upload URL",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Upload URL With Binary",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Merge Case With Original PDF",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "PDF.co Get Upload URL": {
+      "main": [
+        [
+          {
+            "node": "Merge Upload URL With Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Upload URL With Binary": {
+      "main": [
+        [
+          {
+            "node": "PDF.co Upload PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF.co Upload PDF": {
+      "main": [
+        [
+          {
+            "node": "Set PDF.co Uploaded URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set PDF.co Uploaded URL": {
+      "main": [
+        [
+          {
+            "node": "PDF.co OCR PDF to Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF.co OCR PDF to Text": {
+      "main": [
+        [
+          {
+            "node": "Wait for PDF.co OCR Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for PDF.co OCR Job": {
+      "main": [
+        [
+          {
+            "node": "PDF.co Check OCR Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF.co Check OCR Job": {
+      "main": [
+        [
+          {
+            "node": "Normalize PDF.co OCR Job Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OCR Result Is URL": {
+      "main": [
+        [
+          {
+            "node": "PDF.co Download OCR Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OCR Still Processing?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF.co OCR Not Ready - Stop": {
+      "main": [
+        [
+          {
+            "node": "Format OCR Error Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format OCR Error Webhook Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF.co Download OCR Text": {
+      "main": [
+        [
+          {
+            "node": "Normalize PDF.co OCR Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize PDF.co OCR Text": {
+      "main": [
+        [
+          {
+            "node": "Parse DOCUMENT_SYSTEM Fields - Structured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse DOCUMENT_SYSTEM Fields - Structured": {
+      "main": [
+        [
+          {
+            "node": "Set Salesforce Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Salesforce Context": {
+      "main": [
+        [
+          {
+            "node": "Validate Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Extraction": {
+      "main": [
+        [
+          {
+            "node": "Build Duplicate Search SOQL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Manual Review Case Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Duplicate Search SOQL": {
+      "main": [
+        [
+          {
+            "node": "Search Salesforce Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Salesforce Duplicates": {
+      "main": [
+        [
+          {
+            "node": "Duplicate Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Duplicate Check": {
+      "main": [
+        [
+          {
+            "node": "Build Account Lookup SOQL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Duplicate Review - Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Duplicate Review - Stop": {
+      "main": [
+        [
+          {
+            "node": "Format Duplicate Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Duplicate Webhook Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build DOCUMENT_SYSTEM Case Body": {
+      "main": [
+        [
+          {
+            "node": "Create Salesforce Case REST",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Manual Review Case Body": {
+      "main": [
+        [
+          {
+            "node": "Create Manual Review Salesforce Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Manual Review Webhook Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Salesforce Case REST": {
+      "main": [
+        [
+          {
+            "node": "Merge Case With Original PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Success Webhook Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Case With Original PDF": {
+      "main": [
+        [
+          {
+            "node": "Prepare Salesforce Case File Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Salesforce Case File Upload": {
+      "main": [
+        [
+          {
+            "node": "Upload DOCUMENT_SYSTEM PDF to Salesforce Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload DOCUMENT_SYSTEM PDF to Salesforce Case": {
+      "main": [
+        [
+          {
+            "node": "Get Uploaded Salesforce ContentVersion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Uploaded Salesforce ContentVersion": {
+      "main": [
+        [
+          {
+            "node": "Build PDF.co Cleanup Body - Uploaded PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build PDF.co Cleanup Body - Uploaded PDF": {
+      "main": [
+        [
+          {
+            "node": "PDF.co Delete Uploaded Source File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF.co Delete Uploaded Source File": {
+      "main": [
+        [
+          {
+            "node": "Build PDF.co Cleanup Body - OCR Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build PDF.co Cleanup Body - OCR Output": {
+      "main": [
+        [
+          {
+            "node": "OCR Output URL Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OCR Output URL Exists?": {
+      "main": [
+        [
+          {
+            "node": "PDF.co Delete OCR Output File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Success Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF.co Delete OCR Output File": {
+      "main": [
+        [
+          {
+            "node": "Format Success Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Account Lookup SOQL": {
+      "main": [
+        [
+          {
+            "node": "Search Salesforce Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Salesforce Account": {
+      "main": [
+        [
+          {
+            "node": "Describe Salesforce Case Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Manual Review Salesforce Case": {
+      "main": [
+        [
+          {
+            "node": "Format Manual Review Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Describe Salesforce Case Fields": {
+      "main": [
+        [
+          {
+            "node": "Build DOCUMENT_SYSTEM Case Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize PDF.co OCR Job Status": {
+      "main": [
+        [
+          {
+            "node": "OCR Result Is URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OCR Still Processing?": {
+      "main": [
+        [
+          {
+            "node": "Wait for PDF.co OCR Retry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PDF.co OCR Not Ready - Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for PDF.co OCR Retry": {
+      "main": [
+        [
+          {
+            "node": "PDF.co Check OCR Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "nodeGroups": [],
+  "tags": []
+}

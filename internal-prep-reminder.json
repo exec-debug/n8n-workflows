@@ -1,0 +1,358 @@
+{
+  "name": "Internal Meeting Preparation Reminder",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Public Template Safety\n\n- Test mode is enabled by default.\n- Draft mode is enabled where supported.\n- Connect your own credentials after import.\n- Replace placeholders with your configuration.\n- Validate every branch before enabling schedules or live actions.",
+        "color": 5
+      },
+      "id": "SAMPLE_NODE_ID_001",
+      "name": "Sticky Note 59971dc0",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1232,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Eligibility Rules\n\nMeeting_Status__c = Scheduled\nX24_Hour_Reminder_Sent__c = true\nMeeting_Start_Date_Time__c > now\nReminder_24h_Scheduled_Time__c <= now\nLead_Email__c != null\nRelated_Lead__c != null\nMeeting_Key__c != null",
+        "color": 3
+      },
+      "id": "SAMPLE_NODE_ID_002",
+      "name": "Sticky Note 2ef0040a",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1232,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Public Template Safety\n\n- Test mode is enabled by default.\n- Draft mode is enabled where supported.\n- Connect your own credentials after import.\n- Replace placeholders with your configuration.\n- Validate every branch before enabling schedules or live actions.",
+        "color": 4
+      },
+      "id": "SAMPLE_NODE_ID_003",
+      "name": "Sticky Note ff141737",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1232,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "tm",
+              "name": "testMode",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "dm",
+              "name": "draftMode",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "to",
+              "name": "testRecipientOverride",
+              "type": "string",
+              "value": "user@example.com"
+            },
+            {
+              "id": "le",
+              "name": "colleagueEmail",
+              "type": "string",
+              "value": "colleague@example.com"
+            },
+            {
+              "id": "bl",
+              "name": "batchLimit",
+              "type": "number",
+              "value": 10
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_004",
+      "name": "Confirmation Email Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ \"SELECT Id, Meeting_Key__c, Related_Lead__c, Lead_Email__c, Meeting_Start_Date_Time__c, Meeting_Timezone__c, Reminder_24h_Scheduled_Time__c, Outlook_Subject__c, Internal_Attendees__c, External_Attendees__c, Outlook_Event_ID__c FROM Meeting_Reminder_Tracker__c WHERE Meeting_Status__c = 'Scheduled' AND X24_Hour_Reminder_Sent__c = true AND Prep_reminder_sent__c = false AND Meeting_Start_Date_Time__c > \" + $now.toISO() + \" AND Reminder_24h_Scheduled_Time__c <= \" + $now.toISO() + \" AND Lead_Email__c != null AND Related_Lead__c != null AND Meeting_Key__c != null LIMIT \" + $('Confirmation Email Config').item.json.batchLimit }}"
+      },
+      "id": "SAMPLE_NODE_ID_005",
+      "name": "Query Eligible Trackers",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "leadId": "={{ $json.Related_Lead__c }}"
+      },
+      "id": "SAMPLE_NODE_ID_006",
+      "name": "Fetch Lead Name",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Confirmation Email Config').item.json;\nconst trackerItems = $('Query Eligible Trackers').all();\nconst leadItems = $input.all();\nconst results = [];\n\nfor (let i = 0; i < trackerItems.length; i++) {\n  const tracker = trackerItems[i].json;\n  const lead = leadItems[i] ? leadItems[i].json : {};\n\n  const tz = tracker.Meeting_Timezone__c || 'America/Los_Angeles';\n  let readableDateTime = tracker.Meeting_Start_Date_Time__c || '';\n  try {\n    const dt = new Date(tracker.Meeting_Start_Date_Time__c);\n    readableDateTime = dt.toLocaleString('en-US', {\n      timeZone: tz, weekday: 'long', year: 'numeric', month: 'long',\n      day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short'\n    });\n  } catch(e) {}\n\n  const leadName = String(lead.Name || lead.FirstName || tracker.Lead_Email__c || '');\n  const leadEmail = String(tracker.Lead_Email__c || lead.Email || '');\n  const meetingKey = String(tracker.Meeting_Key__c || '');\n  const trackerId = String(tracker.Id || '');\n  const outlookEventId = String(tracker.Outlook_Event_ID__c || '');\n  const subject = String(tracker.Outlook_Subject__c || '');\n  const internalAttendees = String(tracker.Internal_Attendees__c || '');\n  const externalAttendees = String(tracker.External_Attendees__c || '');\n\n  const toAddress = cfg.testMode === true\n    ? String(cfg.testRecipientOverride || 'user@example.com')\n    : String(cfg.colleagueEmail || 'colleague@example.com');\n\n  const emailSubject = 'PREP REMINDER: ' + subject + ' — ' + readableDateTime;\n\n  const bodyHtml =\n    '<p>Hi Example Representative,</p>'\n    + '<p>This is your internal prep reminder for the upcoming meeting below. Please prepare your discovery notes for Example User before the call.</p>'\n    + '<table style=\"font-family:sans-serif;font-size:14px;border-collapse:collapse;\">'\n    + '<tr><td style=\"padding:4px 12px 4px 0;\"><b>Lead Name:</b></td><td>' + leadName + '</td></tr>'\n    + '<tr><td style=\"padding:4px 12px 4px 0;\"><b>Lead Email:</b></td><td>' + leadEmail + '</td></tr>'\n    + '<tr><td style=\"padding:4px 12px 4px 0;\"><b>Meeting Subject:</b></td><td>' + subject + '</td></tr>'\n    + '<tr><td style=\"padding:4px 12px 4px 0;\"><b>Meeting Time:</b></td><td><strong>' + readableDateTime + '</strong></td></tr>'\n    + '<tr><td style=\"padding:4px 12px 4px 0;\"><b>Meeting Timezone:</b></td><td>' + tz + '</td></tr>'\n    + '<tr><td style=\"padding:4px 12px 4px 0;\"><b>Internal Attendees:</b></td><td>' + internalAttendees + '</td></tr>'\n    + '<tr><td style=\"padding:4px 12px 4px 0;\"><b>External Attendees:</b></td><td>' + externalAttendees + '</td></tr>'\n    + '</table>'\n    + '<p>Please prepare your discovery meeting notes/template for Example User before this call.</p>'\n    + '<p><em>Internal reminder only. Do not reply to the lead from this email.</em></p>'\n    + '<p><em>This is an automated internal reminder from n8n.</em></p>';\n\n  results.push({ json: {\n    trackerId, meetingKey,\n    leadId: String(tracker.Related_Lead__c || ''),\n    leadName, leadEmail, toAddress, emailSubject, bodyHtml, readableDateTime,\n    testMode: cfg.testMode === true,\n    draftMode: cfg.draftMode === true\n  }});\n}\nreturn results.length > 0 ? results : [{ json: { noEligible: true } }];"
+      },
+      "id": "SAMPLE_NODE_ID_007",
+      "name": "Format Prep Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "e",
+              "leftValue": "={{ $json.trackerId }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_008",
+      "name": "Eligible?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "toRecipients": "={{ $json.toAddress }}",
+        "subject": "={{ $json.emailSubject }}",
+        "bodyContent": "={{ $json.bodyHtml }}",
+        "additionalFields": {
+          "bodyContentType": "html"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_009",
+      "name": "Send Live Email",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        288
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_010",
+      "name": "No Meetings Due",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        288
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_011",
+      "name": "Manual Admin Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "update",
+        "customObject": "Meeting_Reminder_Tracker__c",
+        "recordId": "={{ $('Format Prep Email').item.json.trackerId }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Prep_reminder_sent__c",
+              "value": "true"
+            }
+          ]
+        },
+        "updateFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_012",
+      "name": "Mark Prep Reminder Sent",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        2480,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "SAMPLE_NODE_ID_013",
+      "name": "Poll Every 2 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        96
+      ]
+    }
+  ],
+  "connections": {
+    "Confirmation Email Config": {
+      "main": [
+        [
+          {
+            "node": "Query Eligible Trackers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Eligible Trackers": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Lead Name": {
+      "main": [
+        [
+          {
+            "node": "Format Prep Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Prep Email": {
+      "main": [
+        [
+          {
+            "node": "Eligible?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eligible?": {
+      "main": [
+        [
+          {
+            "node": "Send Live Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Meetings Due",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Admin Run": {
+      "main": [
+        [
+          {
+            "node": "Confirmation Email Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Live Email": {
+      "main": [
+        [
+          {
+            "node": "Mark Prep Reminder Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Every 2 Hours": {
+      "main": [
+        [
+          {
+            "node": "Confirmation Email Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "nodeGroups": [],
+  "tags": []
+}

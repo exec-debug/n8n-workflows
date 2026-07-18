@@ -1,10 +1,10 @@
 {
-  "name": "US Holiday Check Utility",
+  "name": "US Business Day and Holiday Utility",
   "nodes": [
     {
       "parameters": {},
       "id": "SAMPLE_NODE_ID_001",
-      "name": "Run W11 Manually",
+      "name": "Run Business-Day Utility Manually",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
@@ -123,7 +123,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Manual mode only — fires from Run W11 Manually trigger.\n// Always returns 12 hardcoded 2026+2027 test cases.\n// Ignores any input.\n\nreturn [{ json: {\n  mode: 'manual',\n  error: false,\n  tzWarning: null,\n  dtWarning: null,\n  testCases: [\n    { label: '2026-TC1: July 4 2026 (Sat) — New York',              dateTime: '2026-07-04T12:00:00', timezone: 'America/New_York'   },\n    { label: '2026-TC2: July 4 2026 (Sat) — Los Angeles',           dateTime: '2026-07-04T12:00:00', timezone: 'America/Los_Angeles' },\n    { label: '2026-TC3: Christmas 2026 (Fri) — Chicago',            dateTime: '2026-12-25T12:00:00', timezone: 'America/Chicago'    },\n    { label: '2026-TC4: Normal Tuesday Jul 7 2026 — Denver',        dateTime: '2026-07-07T12:00:00', timezone: 'America/Denver'     },\n    { label: '2026-TC5: Saturday Jul 11 2026 — New York',           dateTime: '2026-07-11T12:00:00', timezone: 'America/New_York'   },\n    { label: '2026-TC6: Sunday Jul 12 2026 — Los Angeles',          dateTime: '2026-07-12T12:00:00', timezone: 'America/Los_Angeles' },\n    { label: \"2027-TC7: New Year's Day Jan 1 2027 (Fri) — New York\",dateTime: '2027-01-01T12:00:00', timezone: 'America/New_York'   },\n    { label: '2027-TC8: Jul 5 2027 (observed Mon for Jul 4) — Chicago', dateTime: '2027-07-05T12:00:00', timezone: 'America/Chicago' },\n    { label: '2027-TC9: Dec 24 2027 (observed Fri for Dec 25) — Denver', dateTime: '2027-12-24T12:00:00', timezone: 'America/Denver' },\n    { label: '2027-TC10: Normal Wed Mar 10 2027 — Los Angeles',     dateTime: '2027-03-10T12:00:00', timezone: 'America/Los_Angeles' },\n    { label: '2027-TC11: Saturday Aug 7 2027 — New York',           dateTime: '2027-08-07T12:00:00', timezone: 'America/New_York'   },\n    { label: '2027-TC12: Sunday Sep 5 2027 — Los Angeles',          dateTime: '2027-09-05T12:00:00', timezone: 'America/Los_Angeles' }\n  ]\n}}];\n"
+        "jsCode": "// Manual mode only — fires from Run Business-Day Utility Manually trigger.\n// Always returns 12 hardcoded 2026+2027 test cases.\n// Ignores any input.\n\nreturn [{ json: {\n  mode: 'manual',\n  error: false,\n  tzWarning: null,\n  dtWarning: null,\n  testCases: [\n    { label: '2026-TC1: July 4 2026 (Sat) — New York',              dateTime: '2026-07-04T12:00:00', timezone: 'America/New_York'   },\n    { label: '2026-TC2: July 4 2026 (Sat) — Los Angeles',           dateTime: '2026-07-04T12:00:00', timezone: 'America/Los_Angeles' },\n    { label: '2026-TC3: Christmas 2026 (Fri) — Chicago',            dateTime: '2026-12-25T12:00:00', timezone: 'America/Chicago'    },\n    { label: '2026-TC4: Normal Tuesday Jul 7 2026 — Denver',        dateTime: '2026-07-07T12:00:00', timezone: 'America/Denver'     },\n    { label: '2026-TC5: Saturday Jul 11 2026 — New York',           dateTime: '2026-07-11T12:00:00', timezone: 'America/New_York'   },\n    { label: '2026-TC6: Sunday Jul 12 2026 — Los Angeles',          dateTime: '2026-07-12T12:00:00', timezone: 'America/Los_Angeles' },\n    { label: \"2027-TC7: New Year's Day Jan 1 2027 (Fri) — New York\",dateTime: '2027-01-01T12:00:00', timezone: 'America/New_York'   },\n    { label: '2027-TC8: Jul 5 2027 (observed Mon for Jul 4) — Chicago', dateTime: '2027-07-05T12:00:00', timezone: 'America/Chicago' },\n    { label: '2027-TC9: Dec 24 2027 (observed Fri for Dec 25) — Denver', dateTime: '2027-12-24T12:00:00', timezone: 'America/Denver' },\n    { label: '2027-TC10: Normal Wed Mar 10 2027 — Los Angeles',     dateTime: '2027-03-10T12:00:00', timezone: 'America/Los_Angeles' },\n    { label: '2027-TC11: Saturday Aug 7 2027 — New York',           dateTime: '2027-08-07T12:00:00', timezone: 'America/New_York'   },\n    { label: '2027-TC12: Sunday Sep 5 2027 — Los Angeles',          dateTime: '2027-09-05T12:00:00', timezone: 'America/Los_Angeles' }\n  ]\n}}];\n"
       },
       "id": "SAMPLE_NODE_ID_007",
       "name": "Prepare Manual Test Cases",
@@ -154,7 +154,7 @@
         ]
       ]
     },
-    "Run W11 Manually": {
+    "Run Business-Day Utility Manually": {
       "main": [
         [
           {

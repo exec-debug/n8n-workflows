@@ -1,0 +1,1153 @@
+{
+  "name": "Onboarding Calendar to CRM",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_001",
+      "name": "Run Onboarding Sync",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "includeRecurringInstances": true,
+        "startDateTime": "2025-01-01T00:00:00",
+        "endDateTime": "2025-12-31T23:59:59",
+        "returnAll": true,
+        "output": "fields",
+        "fields": [
+          "subject",
+          "start",
+          "end",
+          "organizer",
+          "attendees",
+          "bodyPreview",
+          "iCalUId",
+          "webLink",
+          "isCancelled"
+        ]
+      },
+      "id": "SAMPLE_NODE_ID_002",
+      "name": "Fetch Example User Calendar",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        224,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst KEYWORDS = ['onboarding','onboarding call','onboarding follow-up','weekly onboarding','follow-up call'];\nconst INTERNAL = 'example.com';\nconst KNOWN = {\n  'client-a.example.com':           { company:'Example Client A',              fallbackEmail:'contact@client.example.com',         isVendor:false },\n  'client-a-alt.example.com':         { company:'Example Client A',              fallbackEmail:'contact@client.example.com',         isVendor:false },\n  'client-b.example.com': { company:'Example Client B', fallbackEmail:'contact@client.example.com', isVendor:false },\n  'client-c.example.com':              { company:'Example Client C',                    fallbackEmail:'contact@client.example.com',             isVendor:false },\n  'client-c-alt.example.com':         { company:'Example Client C',                    fallbackEmail:'contact@client.example.com',             isVendor:false },\n  'vendor-a.example.com':          { company:'Example Vendor A',                 fallbackEmail:'vendor@example.com',            isVendor:true },\n  'vendor-b.example.com':              { company:'Example Vendor B',                     fallbackEmail:'vendor@example.com',               isVendor:true }\n};\n\nconst results = [];\nfor (const item of $input.all()) {\n  const evt = item.json;\n  if (evt.isCancelled) continue;\n\n  const combined = ((evt.subject||'') + ' ' + (evt.bodyPreview||'')).toLowerCase();\n  if (!KEYWORDS.some(k => combined.includes(k))) continue;\n\n  const allAttendees = (evt.attendees||[]).map(a=>a.emailAddress?.address||'').filter(Boolean);\n  const externalAttendees = allAttendees.filter(e=>!e.toLowerCase().endsWith('@'+INTERNAL));\n\n  // Require at least one external attendee — drops internal-only huddles\n  if (externalAttendees.length === 0) continue;\n\n  const startRaw = evt.start?.dateTime || '';\n  const endRaw   = evt.end?.dateTime   || '';\n  const startISO = startRaw.endsWith('Z') ? startRaw : startRaw + 'Z';\n  const endISO   = endRaw.endsWith('Z')   ? endRaw   : endRaw   + 'Z';\n  const calendarEventId = (evt.iCalUId || evt.id || 'unknown') + '_' + startISO.replace(/[^0-9TZ]/g,'');\n  const organizer = evt.organizer?.emailAddress?.address || '';\n  const primaryEmail = externalAttendees[0];\n  const primaryDomain = primaryEmail ? primaryEmail.split('@')[1] : null;\n  const mapped = KNOWN[primaryDomain] || null;\n  const isVendor = mapped?.isVendor || false;\n  const fallbackCompany = mapped?.company || primaryDomain || 'Unknown';\n  const fallbackEmail = mapped?.fallbackEmail || primaryEmail;\n  const externalEmailList = externalAttendees.map(e=>\"'\"+e.replace(/'/g,\"\\\\'\"  )+\"'\").join(',');\n\n  results.push({ json: {\n    calendarEventId,\n    subject:           evt.subject || '',\n    startDateTime:     startISO,\n    endDateTime:       endISO,\n    startDateOnly:     startISO.substring(0,10),\n    organizer,\n    allAttendees:      allAttendees.join(','),\n    externalAttendees: externalAttendees.join(','),\n    externalEmailList,\n    primaryEmail:      fallbackEmail,\n    primaryDomain:     primaryDomain || '',\n    fallbackCompany,\n    isVendor,\n    trackerName:       fallbackCompany + ' - Client Onboarding',\n    meetingType:       isVendor ? 'Vendor Onboarding' : 'Client Onboarding',\n    clientFacing:      !isVendor\n  }});\n}\nreturn results;\n"
+      },
+      "id": "SAMPLE_NODE_ID_003",
+      "name": "Filter and Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\nlet trackersCreated = 0, trackersUpdated = 0, eventsCreated = 0, eventsSkipped = 0;\nconst errors = [];\nfor (const item of items) {\n  const d = item.json;\n  if (d.trackerAction === 'created') trackersCreated++;\n  if (d.trackerAction === 'updated') trackersUpdated++;\n  if (d.result === 'created' && d.eventCreated) eventsCreated++;\n  if (d.result === 'skipped_duplicate') eventsSkipped++;\n  if (d.sfSuccess === false || d.result === 'error') {\n    errors.push({ calendarEventId: d.calendarEventId, sfRaw: d.sfRawResponse || 'no detail' });\n  }\n}\nreturn [{ json: {\n  status: errors.length === 0 ? 'SUCCESS' : 'COMPLETED_WITH_ERRORS',\n  totalProcessed: items.length,\n  trackersCreated,\n  trackersUpdated,\n  eventsCreated,\n  eventsSkipped,\n  errors,\n  completedAt: new Date().toISOString()\n}}];\n"
+      },
+      "id": "SAMPLE_NODE_ID_004",
+      "name": "Sync Complete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "=SELECT Id, Email, AccountId FROM Contact WHERE Email IN ({{ $('Loop Each Meeting').item.json.externalEmailList }}) LIMIT 1"
+      },
+      "id": "SAMPLE_NODE_ID_005",
+      "name": "Search Contact",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        192
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "=SELECT Id, Name FROM Account WHERE Website LIKE '%{{ $('Loop Each Meeting').item.json.primaryDomain }}%' LIMIT 1"
+      },
+      "id": "SAMPLE_NODE_ID_006",
+      "name": "Search Account by Domain",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        192
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst evt         = $('Loop Each Meeting').item.json;\nconst contactItem = $('Search Contact').item.json;\nconst accountItem = $('Search Account by Domain').item.json;\n\nconst contactId    = contactItem?.Id    || null;\nconst contactEmail = contactItem?.Email || null;\nconst accountFromContact = contactItem?.AccountId || null;\nconst accountFromSearch  = accountItem?.Id        || null;\nconst accountId = accountFromContact || accountFromSearch || null;\n\nconst needsVerification = !contactId || !accountId;\n\nconst notes = [\n  'External attendees: ' + (evt.externalAttendees || 'none'),\n  'Primary domain: ' + (evt.primaryDomain || 'unknown'),\n  contactId ? 'Contact: ' + contactId + ' (' + (contactEmail||'') + ')' : 'No Contact match',\n  accountId ? 'Account: ' + accountId + (accountFromContact ? ' (via Contact.AccountId)' : ' (domain fallback)') : 'No Account match',\n  evt.isVendor ? 'VENDOR - needs verification' : ''\n].filter(Boolean).join(' | ');\n\nreturn [{ json: {\n  ...evt,\n  contactId,\n  contactEmail,\n  accountId,\n  whoId:            contactId  || null,\n  whatId:           accountId  || null,\n  primaryEmail:     contactEmail || evt.primaryEmail,\n  needsVerification,\n  notes,\n  status:           needsVerification ? 'Needs Verification' : 'In Progress',\n  contactMatched:   !!contactId,\n  accountMatched:   !!accountId\n}}];\n"
+      },
+      "id": "SAMPLE_NODE_ID_007",
+      "name": "Resolve Contact and Account",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "=SELECT Id, Name, Onboarding_Meeting_Count__c FROM Client_Onboarding_Tracker__c WHERE OB_Account__c = '{{ $json.accountId }}' LIMIT 1"
+      },
+      "id": "SAMPLE_NODE_ID_008",
+      "name": "Search Tracker by Account",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        1568,
+        192
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "=SELECT Id, Name, Onboarding_Meeting_Count__c FROM Client_Onboarding_Tracker__c WHERE Name = '{{ $('Resolve Contact and Account').item.json.trackerName }}' LIMIT 1"
+      },
+      "id": "SAMPLE_NODE_ID_009",
+      "name": "Search Tracker by Name",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        192
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst m      = $('Resolve Contact and Account').item.json;\nconst byAcct = $('Search Tracker by Account').item.json;\nconst byName = $('Search Tracker by Name').item.json;\n\nconst existing = (byAcct?.Id ? byAcct : null) || (byName?.Id ? byName : null) || null;\nconst trackerId           = existing?.Id   || null;\nconst trackerName         = existing?.Name || m.trackerName;\nconst currentMeetingCount = Number(existing?.Onboarding_Meeting_Count__c || 0);\nconst newMeetingCount     = currentMeetingCount + 1;\n\nreturn [{ json: { ...m, trackerId, trackerName, trackerExists: !!trackerId, newMeetingCount } }];\n"
+      },
+      "id": "SAMPLE_NODE_ID_010",
+      "name": "Resolve Tracker",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst m = $input.first().json;\nconst payload = {\n  Onboarding_Source__c:             'Example User Calendar',\n  Onboarding_Status__c:             m.status,\n  Last_Onboarding_Meeting_Date__c:  m.startDateOnly,\n  Next_Onboarding_Meeting_Date__c:  null,\n  Onboarding_Meeting_Count__c:      m.newMeetingCount,\n  Onboarding_Needs_Verification__c: m.needsVerification,\n  Onboarding_Notes__c:              m.notes,\n  Calendar_Event_ID__c:             m.calendarEventId\n};\nif (m.accountId)    payload.OB_Account__c                 = m.accountId;\nif (m.contactId)    payload.Primary_Onboarding_Contact__c = m.contactId;\nif (m.primaryEmail) payload.Primary_Onboarding_Email__c   = m.primaryEmail;\n\nreturn [{ json: { ...m, payload } }];\n"
+      },
+      "id": "SAMPLE_NODE_ID_011",
+      "name": "Build Tracker Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.trackerExists }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_012",
+      "name": "Tracker Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2464,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "update",
+        "customObject": "Client_Onboarding_Tracker__c",
+        "recordId": "={{ $json.trackerId }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Onboarding_Source__c",
+              "value": "={{ $json.payload.Onboarding_Source__c }}"
+            },
+            {
+              "fieldId": "Onboarding_Status__c",
+              "value": "={{ $json.payload.Onboarding_Status__c }}"
+            },
+            {
+              "fieldId": "Last_Onboarding_Meeting_Date__c",
+              "value": "={{ $json.payload.Last_Onboarding_Meeting_Date__c }}"
+            },
+            {
+              "fieldId": "Onboarding_Meeting_Count__c",
+              "value": "={{ $json.payload.Onboarding_Meeting_Count__c }}"
+            },
+            {
+              "fieldId": "Onboarding_Needs_Verification__c",
+              "value": "={{ $json.payload.Onboarding_Needs_Verification__c }}"
+            },
+            {
+              "fieldId": "Onboarding_Notes__c",
+              "value": "={{ $json.payload.Onboarding_Notes__c }}"
+            },
+            {
+              "fieldId": "Calendar_Event_ID__c",
+              "value": "={{ $json.payload.Calendar_Event_ID__c }}"
+            },
+            {
+              "fieldId": "Primary_Onboarding_Email__c",
+              "value": "={{ $json.payload.Primary_Onboarding_Email__c || null }}"
+            },
+            {
+              "fieldId": "OB_Account__c",
+              "value": "={{ $json.payload.OB_Account__c || null }}"
+            },
+            {
+              "fieldId": "Primary_Onboarding_Contact__c",
+              "value": "={{ $json.payload.Primary_Onboarding_Contact__c || null }}"
+            }
+          ]
+        },
+        "updateFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_013",
+      "name": "Update Tracker",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        2688,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "u1",
+              "name": "resolvedTrackerId",
+              "value": "={{ $('Build Tracker Payload').item.json.trackerId }}",
+              "type": "string"
+            },
+            {
+              "id": "u2",
+              "name": "trackerAction",
+              "value": "updated",
+              "type": "string"
+            },
+            {
+              "id": "u3",
+              "name": "calendarEventId",
+              "value": "={{ $('Build Tracker Payload').item.json.calendarEventId }}",
+              "type": "string"
+            },
+            {
+              "id": "u4",
+              "name": "subject",
+              "value": "={{ $('Build Tracker Payload').item.json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "u5",
+              "name": "startDateTime",
+              "value": "={{ $('Build Tracker Payload').item.json.startDateTime }}",
+              "type": "string"
+            },
+            {
+              "id": "u6",
+              "name": "endDateTime",
+              "value": "={{ $('Build Tracker Payload').item.json.endDateTime }}",
+              "type": "string"
+            },
+            {
+              "id": "u7",
+              "name": "organizer",
+              "value": "={{ $('Build Tracker Payload').item.json.organizer }}",
+              "type": "string"
+            },
+            {
+              "id": "u8",
+              "name": "allAttendees",
+              "value": "={{ $('Build Tracker Payload').item.json.allAttendees }}",
+              "type": "string"
+            },
+            {
+              "id": "u9",
+              "name": "externalAttendees",
+              "value": "={{ $('Build Tracker Payload').item.json.externalAttendees }}",
+              "type": "string"
+            },
+            {
+              "id": "u10",
+              "name": "whoId",
+              "value": "={{ $('Build Tracker Payload').item.json.whoId }}",
+              "type": "string"
+            },
+            {
+              "id": "u11",
+              "name": "whatId",
+              "value": "={{ $('Build Tracker Payload').item.json.whatId }}",
+              "type": "string"
+            },
+            {
+              "id": "u12",
+              "name": "contactId",
+              "value": "={{ $('Build Tracker Payload').item.json.contactId }}",
+              "type": "string"
+            },
+            {
+              "id": "u13",
+              "name": "accountId",
+              "value": "={{ $('Build Tracker Payload').item.json.accountId }}",
+              "type": "string"
+            },
+            {
+              "id": "u14",
+              "name": "contactMatched",
+              "value": "={{ $('Build Tracker Payload').item.json.contactMatched }}",
+              "type": "boolean"
+            },
+            {
+              "id": "u15",
+              "name": "accountMatched",
+              "value": "={{ $('Build Tracker Payload').item.json.accountMatched }}",
+              "type": "boolean"
+            },
+            {
+              "id": "u16",
+              "name": "needsVerification",
+              "value": "={{ $('Build Tracker Payload').item.json.needsVerification }}",
+              "type": "boolean"
+            },
+            {
+              "id": "u17",
+              "name": "notes",
+              "value": "={{ $('Build Tracker Payload').item.json.notes }}",
+              "type": "string"
+            },
+            {
+              "id": "u18",
+              "name": "primaryEmail",
+              "value": "={{ $('Build Tracker Payload').item.json.primaryEmail }}",
+              "type": "string"
+            },
+            {
+              "id": "u19",
+              "name": "primaryDomain",
+              "value": "={{ $('Build Tracker Payload').item.json.primaryDomain }}",
+              "type": "string"
+            },
+            {
+              "id": "u20",
+              "name": "fallbackCompany",
+              "value": "={{ $('Build Tracker Payload').item.json.fallbackCompany }}",
+              "type": "string"
+            },
+            {
+              "id": "u21",
+              "name": "clientFacing",
+              "value": "={{ $('Build Tracker Payload').item.json.clientFacing }}",
+              "type": "boolean"
+            },
+            {
+              "id": "u22",
+              "name": "meetingType",
+              "value": "={{ $('Build Tracker Payload').item.json.meetingType }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_014",
+      "name": "Set Tracker Id (Update)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2912,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "=SELECT Id FROM Event WHERE Subject = '{{ $json.subject.trim() }}' AND StartDateTime = {{ $json.startDateTime }} LIMIT 1"
+      },
+      "id": "SAMPLE_NODE_ID_015",
+      "name": "Check Duplicate Event",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        3136,
+        192
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "customObject": "Client_Onboarding_Tracker__c",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Onboarding_Start_Date__c",
+              "value": "={{ $json.startDateOnly }}"
+            },
+            {
+              "fieldId": "Onboarding_Source__c",
+              "value": "={{ $json.payload.Onboarding_Source__c }}"
+            },
+            {
+              "fieldId": "Onboarding_Status__c",
+              "value": "={{ $json.payload.Onboarding_Status__c }}"
+            },
+            {
+              "fieldId": "Last_Onboarding_Meeting_Date__c",
+              "value": "={{ $json.payload.Last_Onboarding_Meeting_Date__c }}"
+            },
+            {
+              "fieldId": "Onboarding_Meeting_Count__c",
+              "value": "={{ $json.payload.Onboarding_Meeting_Count__c }}"
+            },
+            {
+              "fieldId": "Onboarding_Needs_Verification__c",
+              "value": "={{ $json.payload.Onboarding_Needs_Verification__c }}"
+            },
+            {
+              "fieldId": "Onboarding_Notes__c",
+              "value": "={{ $json.payload.Onboarding_Notes__c }}"
+            },
+            {
+              "fieldId": "Calendar_Event_ID__c",
+              "value": "={{ $json.payload.Calendar_Event_ID__c }}"
+            },
+            {
+              "fieldId": "Primary_Onboarding_Email__c",
+              "value": "={{ $json.payload.Primary_Onboarding_Email__c || null }}"
+            },
+            {
+              "fieldId": "OB_Account__c",
+              "value": "={{ $json.payload.OB_Account__c || null }}"
+            },
+            {
+              "fieldId": "Primary_Onboarding_Contact__c",
+              "value": "={{ $json.payload.Primary_Onboarding_Contact__c || null }}"
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_016",
+      "name": "Create Tracker",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        2688,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "resolvedTrackerId",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "c2",
+              "name": "trackerAction",
+              "value": "created",
+              "type": "string"
+            },
+            {
+              "id": "c3",
+              "name": "trackerSfSuccess",
+              "value": "={{ $json.success }}",
+              "type": "boolean"
+            },
+            {
+              "id": "c4",
+              "name": "calendarEventId",
+              "value": "={{ $('Build Tracker Payload').item.json.calendarEventId }}",
+              "type": "string"
+            },
+            {
+              "id": "c5",
+              "name": "subject",
+              "value": "={{ $('Build Tracker Payload').item.json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "c6",
+              "name": "startDateTime",
+              "value": "={{ $('Build Tracker Payload').item.json.startDateTime }}",
+              "type": "string"
+            },
+            {
+              "id": "c7",
+              "name": "endDateTime",
+              "value": "={{ $('Build Tracker Payload').item.json.endDateTime }}",
+              "type": "string"
+            },
+            {
+              "id": "c8",
+              "name": "organizer",
+              "value": "={{ $('Build Tracker Payload').item.json.organizer }}",
+              "type": "string"
+            },
+            {
+              "id": "c9",
+              "name": "allAttendees",
+              "value": "={{ $('Build Tracker Payload').item.json.allAttendees }}",
+              "type": "string"
+            },
+            {
+              "id": "c10",
+              "name": "externalAttendees",
+              "value": "={{ $('Build Tracker Payload').item.json.externalAttendees }}",
+              "type": "string"
+            },
+            {
+              "id": "c11",
+              "name": "whoId",
+              "value": "={{ $('Build Tracker Payload').item.json.whoId }}",
+              "type": "string"
+            },
+            {
+              "id": "c12",
+              "name": "whatId",
+              "value": "={{ $('Build Tracker Payload').item.json.whatId }}",
+              "type": "string"
+            },
+            {
+              "id": "c13",
+              "name": "contactId",
+              "value": "={{ $('Build Tracker Payload').item.json.contactId }}",
+              "type": "string"
+            },
+            {
+              "id": "c14",
+              "name": "accountId",
+              "value": "={{ $('Build Tracker Payload').item.json.accountId }}",
+              "type": "string"
+            },
+            {
+              "id": "c15",
+              "name": "contactMatched",
+              "value": "={{ $('Build Tracker Payload').item.json.contactMatched }}",
+              "type": "boolean"
+            },
+            {
+              "id": "c16",
+              "name": "accountMatched",
+              "value": "={{ $('Build Tracker Payload').item.json.accountMatched }}",
+              "type": "boolean"
+            },
+            {
+              "id": "c17",
+              "name": "needsVerification",
+              "value": "={{ $('Build Tracker Payload').item.json.needsVerification }}",
+              "type": "boolean"
+            },
+            {
+              "id": "c18",
+              "name": "notes",
+              "value": "={{ $('Build Tracker Payload').item.json.notes }}",
+              "type": "string"
+            },
+            {
+              "id": "c19",
+              "name": "primaryEmail",
+              "value": "={{ $('Build Tracker Payload').item.json.primaryEmail }}",
+              "type": "string"
+            },
+            {
+              "id": "c20",
+              "name": "primaryDomain",
+              "value": "={{ $('Build Tracker Payload').item.json.primaryDomain }}",
+              "type": "string"
+            },
+            {
+              "id": "c21",
+              "name": "fallbackCompany",
+              "value": "={{ $('Build Tracker Payload').item.json.fallbackCompany }}",
+              "type": "string"
+            },
+            {
+              "id": "c22",
+              "name": "clientFacing",
+              "value": "={{ $('Build Tracker Payload').item.json.clientFacing }}",
+              "type": "boolean"
+            },
+            {
+              "id": "c23",
+              "name": "meetingType",
+              "value": "={{ $('Build Tracker Payload').item.json.meetingType }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_017",
+      "name": "Set Tracker Id (Create)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2912,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_018",
+      "name": "Loop Each Meeting",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        672,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.Id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_019",
+      "name": "Event Already Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3360,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "sk1",
+              "name": "result",
+              "value": "skipped_duplicate",
+              "type": "string"
+            },
+            {
+              "id": "sk2",
+              "name": "eventCreated",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "sk3",
+              "name": "existingEventId",
+              "value": "={{ $json.Id }}",
+              "type": "string"
+            },
+            {
+              "id": "sk4",
+              "name": "trackerAction",
+              "value": "={{ $('Set Tracker Id (Update)').item.json.trackerAction || $('Set Tracker Id (Create)').item.json.trackerAction }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_020",
+      "name": "Skip Event (Duplicate)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3584,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Safely pull context from whichever tracker branch ran\nlet r = null;\ntry { r = $('Set Tracker Id (Update)').item.json; } catch(e) {}\nif (!r || !r.subject) {\n  try { r = $('Set Tracker Id (Create)').item.json; } catch(e) {}\n}\nif (!r || !r.subject) { r = $input.first().json; }\n\nconst desc = [\n  'SOURCE: Example User Calendar (Outlook / user@example.com)',\n  'ORGANIZER: ' + (r.organizer || 'unknown'),\n  'ALL ATTENDEES: ' + (r.allAttendees || 'none'),\n  'EXTERNAL ATTENDEES: ' + (r.externalAttendees || 'none'),\n  'PRIMARY EMAIL: ' + (r.primaryEmail || 'none'),\n  'DOMAIN: ' + (r.primaryDomain || 'unknown'),\n  'CLASSIFICATION: ' + (r.meetingType || 'unknown'),\n  'CLIENT FACING: ' + (r.clientFacing ? 'Yes' : 'No'),\n  'NEEDS VERIFICATION: ' + (r.needsVerification ? 'Yes' : 'No'),\n  'CALENDAR EVENT ID: ' + (r.calendarEventId || 'unknown'),\n  'TRACKER ID: ' + (r.resolvedTrackerId || 'none'),\n  'TRACKER ACTION: ' + (r.trackerAction || 'none'),\n  'CONTACT MATCHED: ' + (r.contactMatched ? 'Yes' : 'No'),\n  'ACCOUNT MATCHED: ' + (r.accountMatched ? 'Yes' : 'No'),\n  'NOTES: ' + (r.notes || 'none')\n].join('\\n');\n\nreturn [{ json: { ...r, eventDescription: desc } }];"
+      },
+      "id": "SAMPLE_NODE_ID_021",
+      "name": "Build Event Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3584,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "customObject": "Event",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Subject",
+              "value": "={{ $json.subject }}"
+            },
+            {
+              "fieldId": "StartDateTime",
+              "value": "={{ $json.startDateTime }}"
+            },
+            {
+              "fieldId": "EndDateTime",
+              "value": "={{ $json.endDateTime }}"
+            },
+            {
+              "fieldId": "Description",
+              "value": "={{ $json.eventDescription }}"
+            },
+            {
+              "fieldId": "WhatId",
+              "value": "={{ $json.whatId || null }}"
+            },
+            {
+              "fieldId": "WhoId",
+              "value": "={{ $json.whoId || null }}"
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_022",
+      "name": "Create SF Event",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        3808,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "lr1",
+              "name": "result",
+              "value": "={{ $json.id ? 'created' : 'error' }}",
+              "type": "string"
+            },
+            {
+              "id": "lr2",
+              "name": "eventCreated",
+              "value": "={{ !!$json.id }}",
+              "type": "boolean"
+            },
+            {
+              "id": "lr3",
+              "name": "newEventId",
+              "value": "={{ $json.id || null }}",
+              "type": "string"
+            },
+            {
+              "id": "lr4",
+              "name": "sfSuccess",
+              "value": "={{ $json.success || false }}",
+              "type": "boolean"
+            },
+            {
+              "id": "lr5",
+              "name": "sfRawResponse",
+              "value": "={{ JSON.stringify($json) }}",
+              "type": "string"
+            },
+            {
+              "id": "lr6",
+              "name": "calendarEventId",
+              "value": "={{ $('Build Event Body').item.json.calendarEventId }}",
+              "type": "string"
+            },
+            {
+              "id": "lr7",
+              "name": "subject",
+              "value": "={{ $('Build Event Body').item.json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "lr8",
+              "name": "trackerAction",
+              "value": "={{ $('Build Event Body').item.json.trackerAction }}",
+              "type": "string"
+            },
+            {
+              "id": "lr9",
+              "name": "trackerId",
+              "value": "={{ $('Build Event Body').item.json.resolvedTrackerId }}",
+              "type": "string"
+            },
+            {
+              "id": "lr10",
+              "name": "accountId",
+              "value": "={{ $('Build Event Body').item.json.accountId }}",
+              "type": "string"
+            },
+            {
+              "id": "lr11",
+              "name": "contactId",
+              "value": "={{ $('Build Event Body').item.json.contactId }}",
+              "type": "string"
+            },
+            {
+              "id": "lr12",
+              "name": "contactMatched",
+              "value": "={{ $('Build Event Body').item.json.contactMatched }}",
+              "type": "boolean"
+            },
+            {
+              "id": "lr13",
+              "name": "accountMatched",
+              "value": "={{ $('Build Event Body').item.json.accountMatched }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_023",
+      "name": "Log Event Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4032,
+        432
+      ]
+    }
+  ],
+  "connections": {
+    "Run Onboarding Sync": {
+      "main": [
+        [
+          {
+            "node": "Fetch Example User Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Example User Calendar": {
+      "main": [
+        [
+          {
+            "node": "Filter and Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter and Normalize": {
+      "main": [
+        [
+          {
+            "node": "Loop Each Meeting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Contact": {
+      "main": [
+        [
+          {
+            "node": "Search Account by Domain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Account by Domain": {
+      "main": [
+        [
+          {
+            "node": "Resolve Contact and Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Contact and Account": {
+      "main": [
+        [
+          {
+            "node": "Search Tracker by Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Tracker by Account": {
+      "main": [
+        [
+          {
+            "node": "Search Tracker by Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Tracker by Name": {
+      "main": [
+        [
+          {
+            "node": "Resolve Tracker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Tracker": {
+      "main": [
+        [
+          {
+            "node": "Build Tracker Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Tracker Payload": {
+      "main": [
+        [
+          {
+            "node": "Tracker Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tracker Exists?": {
+      "main": [
+        [
+          {
+            "node": "Update Tracker",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Tracker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Tracker": {
+      "main": [
+        [
+          {
+            "node": "Set Tracker Id (Update)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Tracker Id (Update)": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate Event": {
+      "main": [
+        [
+          {
+            "node": "Event Already Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Tracker": {
+      "main": [
+        [
+          {
+            "node": "Set Tracker Id (Create)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Tracker Id (Create)": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Each Meeting": {
+      "main": [
+        [
+          {
+            "node": "Sync Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Search Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event Already Exists?": {
+      "main": [
+        [
+          {
+            "node": "Skip Event (Duplicate)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Event Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Event (Duplicate)": {
+      "main": [
+        [
+          {
+            "node": "Loop Each Meeting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Event Body": {
+      "main": [
+        [
+          {
+            "node": "Create SF Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create SF Event": {
+      "main": [
+        [
+          {
+            "node": "Log Event Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Event Result": {
+      "main": [
+        [
+          {
+            "node": "Loop Each Meeting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "nodeGroups": [],
+  "tags": []
+}

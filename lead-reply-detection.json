@@ -1,0 +1,1507 @@
+{
+  "name": "Lead Reply Detection",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyHour"
+            }
+          ]
+        },
+        "output": "fields",
+        "fields": [
+          "from",
+          "subject",
+          "bodyPreview",
+          "receivedDateTime",
+          "toRecipients",
+          "ccRecipients",
+          "internetMessageId",
+          "body",
+          "id"
+        ],
+        "filters": {
+          "readStatus": "unread"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_001",
+      "name": "Watch Example User's Inbox",
+      "type": "n8n-nodes-base.microsoftOutlookTrigger",
+      "typeVersion": 1,
+      "position": [
+        112,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "inboxSource",
+              "value": "Example User",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "senderEmail",
+              "value": "={{ $json.from.emailAddress.address }}",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "senderName",
+              "value": "={{ $json.from.emailAddress.name }}",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "subject",
+              "value": "={{ $json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "a5",
+              "name": "bodyPreview",
+              "value": "={{ $json.bodyPreview }}",
+              "type": "string"
+            },
+            {
+              "id": "a6",
+              "name": "receivedDateTime",
+              "value": "={{ $json.receivedDateTime }}",
+              "type": "string"
+            },
+            {
+              "id": "a7",
+              "name": "internetMessageId",
+              "value": "={{ $json.internetMessageId ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "a8",
+              "name": "toRecipients",
+              "value": "={{ $json.toRecipients ? $json.toRecipients.map(r => r.emailAddress.address).join(\", \") : \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "a9",
+              "name": "ccRecipients",
+              "value": "={{ $json.ccRecipients ? $json.ccRecipients.map(r => r.emailAddress.address).join(\", \") : \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "a10",
+              "name": "emailBody",
+              "value": "={{ $json.body?.content || $json.body || $json.bodyPreview || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "a11",
+              "name": "messageId",
+              "value": "={{ $json.id || \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_002",
+      "name": "Normalize Example User's Email",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        432,
+        400
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_003",
+      "name": "Merge Both Inboxes",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1392,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyHour"
+            }
+          ]
+        },
+        "output": "fields",
+        "fields": [
+          "from",
+          "subject",
+          "bodyPreview",
+          "receivedDateTime",
+          "toRecipients",
+          "ccRecipients",
+          "internetMessageId",
+          "body",
+          "id"
+        ],
+        "filters": {
+          "readStatus": "unread"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_004",
+      "name": "Watch Example Representative's Inbox",
+      "type": "n8n-nodes-base.microsoftOutlookTrigger",
+      "typeVersion": 1,
+      "position": [
+        112,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1",
+              "name": "inboxSource",
+              "value": "Example Representative",
+              "type": "string"
+            },
+            {
+              "id": "b2",
+              "name": "senderEmail",
+              "value": "={{ $json.from.emailAddress.address }}",
+              "type": "string"
+            },
+            {
+              "id": "b3",
+              "name": "senderName",
+              "value": "={{ $json.from.emailAddress.name }}",
+              "type": "string"
+            },
+            {
+              "id": "b4",
+              "name": "subject",
+              "value": "={{ $json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "b5",
+              "name": "bodyPreview",
+              "value": "={{ $json.bodyPreview }}",
+              "type": "string"
+            },
+            {
+              "id": "b6",
+              "name": "receivedDateTime",
+              "value": "={{ $json.receivedDateTime }}",
+              "type": "string"
+            },
+            {
+              "id": "b7",
+              "name": "internetMessageId",
+              "value": "={{ $json.internetMessageId ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "b8",
+              "name": "toRecipients",
+              "value": "={{ $json.toRecipients ? $json.toRecipients.map(r => r.emailAddress.address).join(\", \") : \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "b9",
+              "name": "ccRecipients",
+              "value": "={{ $json.ccRecipients ? $json.ccRecipients.map(r => r.emailAddress.address).join(\", \") : \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "b10",
+              "name": "emailBody",
+              "value": "={{ $json.body?.content || $json.body || $json.bodyPreview || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "b11",
+              "name": "messageId",
+              "value": "={{ $json.id || \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_005",
+      "name": "Normalize Example Representative's Email",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        432,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "dedupe-check",
+              "leftValue": "={{ $('Normalize Dedupe Result').item.json.alreadyProcessed }}",
+              "operator": {
+                "operation": "true",
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_006",
+      "name": "Reply Already Processed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        6192,
+        864
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_007",
+      "name": "Reply Task Already Existed — Lead and EST Paused",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        6512,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.replyClassification }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "bounce"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Bounce / Undeliverable"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.replyClassification }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "ooo"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "OOO / Auto Reply"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.replyClassification }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "calendar"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Calendar Invite Response"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.replyClassification }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "human"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Real Human Reply"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Unknown Classification — Skip"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_008",
+      "name": "Route Reply Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        3632,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "status": "Completed",
+        "additionalFields": {
+          "activityDate": "={{ $now.setZone('America/Los_Angeles').toFormat('yyyy-MM-dd') }}",
+          "description": "={{ (() => { const d = $('Normalize Lead Match Result').item.json; const bodyText = String(d.emailBody || '').trim() || String(d.bodyPreview || ''); return ['AWARENESS ACTIVITY LOG','','Classification: OOO / Auto Reply','Automation was NOT paused.','Engagement Status was NOT changed.','Human Override was NOT used.','No human-response reply task was created. This completed awareness activity was logged only.','','Lead Owner: ' + (d.leadOwnerName || 'unknown'),'Lead Owner Email: ' + (d.leadOwnerEmail || 'unknown'),'Lead Owner ID: ' + (d.leadOwnerId || 'unknown'),'','Inbox: ' + (d.inboxSource || ''),'From: ' + (d.senderName || '') + ' <' + (d.senderEmail || '') + '>','To: ' + (d.toRecipients || ''),'CC: ' + (d.ccRecipients || 'none'),'Subject: ' + (d.subject || ''),'Received: ' + (d.receivedDateTime || ''),'Internet Message ID: ' + (d.internetMessageId || ''),'','Email Body:', bodyText].join('\\n'); })() }}",
+          "owner": "={{ $('Normalize Lead Match Result').item.json.taskOwnerId }}",
+          "priority": "Normal",
+          "subject": "Out of Office / Auto Reply Received",
+          "whoId": "={{ $('Normalize Lead Match Result').item.json.leadId }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_009",
+      "name": "Log OOO / Auto Reply as Completed Activity",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        3952,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Normalize Lead Match Result').item.json.leadStatus }}",
+              "operator": {
+                "operation": "notEquals",
+                "type": "string"
+              },
+              "rightValue": "Converted"
+            },
+            {
+              "leftValue": "={{ $('Normalize Lead Match Result').item.json.leadStatus }}",
+              "operator": {
+                "operation": "notEquals",
+                "type": "string"
+              },
+              "rightValue": "Unqualified"
+            },
+            {
+              "leftValue": "={{ $('Normalize Lead Match Result').item.json.engagementStatus }}",
+              "operator": {
+                "operation": "notEquals",
+                "type": "string"
+              },
+              "rightValue": "Closed"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_010",
+      "name": "Check Lead Stage Before Pause",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3952,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "leadId": "={{ $('Normalize Lead Match Result').item.json.leadId }}",
+        "updateFields": {
+          "customFieldsUi": {
+            "customFieldsValues": [
+              {
+                "fieldId": "Last_Meaningful_Contact_Date__c",
+                "value": "={{ $('Normalize Lead Match Result').item.json.receivedDateTime }}"
+              },
+              {
+                "fieldId": "Engagement_Status__c",
+                "value": "Paused - Human Conversation"
+              }
+            ]
+          }
+        }
+      },
+      "id": "SAMPLE_NODE_ID_011",
+      "name": "Update Lead — Pause Active Automation",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        4272,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "status": "Not Started",
+        "additionalFields": {
+          "activityDate": "={{ $now.setZone('America/Los_Angeles').toFormat('yyyy-MM-dd') }}",
+          "description": "={{ $('Prepare Reply Task Payload').item.json.description }}",
+          "owner": "={{ $('Prepare Reply Task Payload').item.json.taskOwnerId }}",
+          "priority": "High",
+          "subject": "={{ $('Prepare Reply Task Payload').item.json.subject }}",
+          "whoId": "={{ $('Prepare Reply Task Payload').item.json.leadId }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_012",
+      "name": "Create Reply Task for Lead Owner",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        7152,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "status": "Completed",
+        "additionalFields": {
+          "activityDate": "={{ $now.setZone('America/Los_Angeles').toFormat('yyyy-MM-dd') }}",
+          "description": "={{ (() => { const d = $('Normalize Lead Match Result').item.json; const bodyText = String(d.emailBody || '').trim() || String(d.bodyPreview || ''); return ['Reply received — lead stage blocked pause.','','AUTOMATION ACTION:','This was classified as a real human reply but automation pause was skipped.','Lead may be Converted, Unqualified, or Closed.','Human Override was NOT used.','No human-response reply task was created. This completed awareness activity was logged only.','','Lead Owner: ' + (d.leadOwnerName || 'unknown'),'Lead Owner Email: ' + (d.leadOwnerEmail || 'unknown'),'Lead Owner ID: ' + (d.leadOwnerId || 'unknown'),'','Inbox: ' + (d.inboxSource || ''),'From: ' + (d.senderName || '') + ' <' + (d.senderEmail || '') + '>','To: ' + (d.toRecipients || ''),'CC: ' + (d.ccRecipients || 'none'),'Subject: ' + (d.subject || ''),'Received: ' + (d.receivedDateTime || ''),'Internet Message ID: ' + (d.internetMessageId || ''),'','Email Body:', bodyText].join('\\n'); })() }}",
+          "owner": "={{ $('Normalize Lead Match Result').item.json.taskOwnerId }}",
+          "priority": "Normal",
+          "subject": "Inbound reply received — lead stage blocked, no automation created",
+          "whoId": "={{ $('Normalize Lead Match Result').item.json.leadId }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_013",
+      "name": "Log Inbound Reply — Lead Stage Blocked, No Automation",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        4272,
+        1072
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 1  Example User's Inbox\nMicrosoft Outlook account (Example User)\nPolls every minute — unread only.\nNormalizes → Get Message (full body) → Enrich → Merge.",
+        "height": 140,
+        "width": 980,
+        "color": 3
+      },
+      "id": "SAMPLE_NODE_ID_014",
+      "name": "Sticky Note bbab3181",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2 Example Representative's Inbox\nMicrosoft Outlook account 2 (Example Representative)\nPolls every minute — unread only.\nNormalizes → Get Message (full body) → Enrich → Merge.",
+        "height": 140,
+        "width": 980,
+        "color": 3
+      },
+      "id": "SAMPLE_NODE_ID_015",
+      "name": "Sticky Note f059b2f6",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 3  Merge + Lead Match + Classify\nSearches Salesforce Leads by cleanedSenderEmail.\nIsConverted = false, IsDeleted = false\nORDER BY LastModifiedDate DESC LIMIT 1\n\n→ Only process emails received on/after June 29, 2026\n→ Match → Classify → Route\n→ Classification happens BEFORE any Engagement Status change\n→ Only Real Human Reply may pause Lead / create reply task",
+        "height": 170,
+        "width": 2340,
+        "color": 3
+      },
+      "id": "SAMPLE_NODE_ID_016",
+      "name": "Sticky Note 125dd39a",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        656,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 4  Human Reply Dedupe (after Lead + EST pause)\nRuns only on Real Human Reply path after Lead pause and EST pause.\nFetches today's reply tasks (up to 50) and matches internetMessageId in Description.\nAlways outputs data even when no task exists.\n\n→ Same Message ID: skip task only → Lead + EST already paused\n→ New Message ID: create task → verify owner",
+        "height": 140,
+        "width": 960,
+        "color": 6
+      },
+      "id": "SAMPLE_NODE_ID_017",
+      "name": "Sticky Note 334bc572",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        992,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 5 Human Reply Actions (classify first)\n\nReal Human Reply:\n  → Classify + Route\n  → Check Lead Stage\n  → Update Lead (Paused - Human Conversation)\n  → Verify Lead pause\n  → Pause Active EST\n  → Dedupe by Message ID\n  → Create reply task for Lead Owner\n  → Verify task owner\n\nOOO / Bounce / Calendar:\n  → Classify + Route\n  → Log completed awareness activity only\n  → No Engagement Status change\n  → No EST pause\n  → No human reply task",
+        "height": 280,
+        "width": 680,
+        "color": 4
+      },
+      "id": "SAMPLE_NODE_ID_018",
+      "name": "Sticky Note 74436bd8",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1328,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 6 OOO / Auto / Bounce / Calendar\nLogs completed awareness Task assigned to matched Lead Owner.\n\nNo Human Override.\nNo Engagement Status change.\nNo EST pause.\nNo human-response reply task.",
+        "height": 140,
+        "width": 360,
+        "color": 5
+      },
+      "id": "SAMPLE_NODE_ID_019",
+      "name": "Sticky Note 3b23a4ce",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1648,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ \"SELECT Id, Name, Status, Email, OwnerId, Owner.Name, Owner.Email, Engagement_Status__c, LastModifiedDate FROM Lead WHERE Email = '\" + $json.leadMatchEmail + \"' AND IsConverted = false AND IsDeleted = false ORDER BY LastModifiedDate DESC LIMIT 1\" }}"
+      },
+      "id": "SAMPLE_NODE_ID_020",
+      "name": "Match Sender Email to Salesforce Lead",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        2352,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst ctx = $('Clean and Normalize Sender Email').item.json;\nconst EXAMPLE_USER_ID = 'SAMPLE_RECORD_ID';\n\nconst emailCtx = {\n  senderEmail: String(ctx.senderEmail || ''),\n  cleanedSenderEmail: String(ctx.cleanedSenderEmail || ''),\n  leadMatchEmail: String(ctx.leadMatchEmail || ctx.cleanedSenderEmail || ''),\n  extractedProspectEmail: String(ctx.extractedProspectEmail || ''),\n  matchedViaExtractedEmail: ctx.matchedViaExtractedEmail === true,\n  isSystemSender: ctx.isSystemSender === true,\n  senderName: String(ctx.senderName || ''),\n  subject: String(ctx.subject || ''),\n  bodyPreview: String(ctx.bodyPreview || ''),\n  emailBodyRaw: String(ctx.emailBodyRaw || ctx.emailBody || ctx.bodyPreview || ''),\n  emailBody: String(ctx.emailBody || ctx.bodyPreview || ''),\n  receivedDateTime: String(ctx.receivedDateTime || ''),\n  internetMessageId: String(ctx.internetMessageId || ''),\n  messageId: String(ctx.messageId || ''),\n  inboxSource: String(ctx.inboxSource || ''),\n  toRecipients: String(ctx.toRecipients || ''),\n  ccRecipients: String(ctx.ccRecipients || '')\n};\n\nfunction ownerName(lead) {\n  return String((lead.Owner && lead.Owner.Name) || lead['Owner.Name'] || '');\n}\nfunction ownerEmail(lead) {\n  return String((lead.Owner && lead.Owner.Email) || lead['Owner.Email'] || '');\n}\n\nif (items.length > 0 && items[0].json && items[0].json.Id) {\n  const lead = items[0].json;\n  const matchedLeadOwnerId = String(lead.OwnerId || '').trim();\n  const taskOwnerId = matchedLeadOwnerId || '';\n\n  return [{ json: {\n    leadFound: true,\n    matchedLeadId: String(lead.Id || ''),\n    matchedLeadName: String(lead.Name || ''),\n    matchedLeadEmail: String(lead.Email || ''),\n    matchedLeadOwnerId,\n    matchedLeadOwnerName: ownerName(lead),\n    matchedLeadOwnerEmail: ownerEmail(lead),\n    taskOwnerId,\n    ownerIdBlank: !matchedLeadOwnerId,\n    leadId: String(lead.Id || ''),\n    leadName: String(lead.Name || ''),\n    leadStatus: String(lead.Status || ''),\n    engagementStatus: String(lead.Engagement_Status__c || ''),\n    leadEmail: String(lead.Email || ''),\n    leadOwnerId: matchedLeadOwnerId,\n    leadOwnerName: ownerName(lead),\n    leadOwnerEmail: ownerEmail(lead),\n    ...emailCtx\n  }}];\n}\n\nreturn [{ json: {\n  leadFound: false,\n  matchedLeadId: null,\n  matchedLeadName: null,\n  matchedLeadEmail: emailCtx.leadMatchEmail,\n  matchedLeadOwnerId: null,\n  matchedLeadOwnerName: null,\n  matchedLeadOwnerEmail: null,\n  taskOwnerId: EXAMPLE_USER_ID,\n  ownerIdBlank: false,\n  leadId: null,\n  leadName: null,\n  leadStatus: null,\n  engagementStatus: null,\n  leadEmail: emailCtx.leadMatchEmail,\n  leadOwnerId: null,\n  leadOwnerName: null,\n  leadOwnerEmail: null,\n  ...emailCtx\n}}];"
+      },
+      "id": "SAMPLE_NODE_ID_021",
+      "name": "Normalize Lead Match Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2672,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "lead-found-check",
+              "leftValue": "={{ $json.leadFound }}",
+              "operator": {
+                "operation": "true",
+                "type": "boolean"
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "lead-id-not-blank",
+              "leftValue": "={{ $json.leadId }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "lead-email-not-blank",
+              "leftValue": "={{ String($json.matchedLeadEmail || $json.leadEmail || '').trim() }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "lead-email-has-at",
+              "leftValue": "={{ String($json.matchedLeadEmail || $json.leadEmail || '').trim() }}",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              },
+              "rightValue": "@"
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_022",
+      "name": "Lead Match Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2992,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "lead-match-email-not-blank",
+              "leftValue": "={{ String($json.leadMatchEmail || '').trim() }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "lead-match-email-has-at",
+              "leftValue": "={{ String($json.leadMatchEmail || '').trim() }}",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              },
+              "rightValue": "@"
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_023",
+      "name": "Sender Match Email Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2192,
+        544
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_024",
+      "name": "Skip — Lead Has No Email",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2992,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const INTERNAL_DOMAINS = ['example.com'];\nconst SYSTEM_SENDER_PATTERNS = [\n  'mailer-daemon', 'postmaster', 'noreply', 'no-reply', 'notifications@',\n  'donotreply', 'do-not-reply', 'bounce', 'delivery', 'mail-daemon'\n];\nconst EMAIL_REGEX = /[A-Z0-9._%+\\-]+@[A-Z0-9.\\-]+\\.[A-Z]{2,}/gi;\n\nfunction isInternalEmail(email) {\n  const domain = String(email || '').split('@')[1] || '';\n  return INTERNAL_DOMAINS.some((dom) => domain.toLowerCase() === dom);\n}\n\nfunction isSystemSender(email) {\n  const lower = String(email || '').toLowerCase();\n  return SYSTEM_SENDER_PATTERNS.some((pattern) => lower.includes(pattern));\n}\n\nfunction extractProspectEmail(subject, emailBody, bodyPreview, cleanedSenderEmail) {\n  const haystack = [subject, emailBody, bodyPreview].join(' ');\n  const matches = haystack.match(EMAIL_REGEX) || [];\n  const seen = new Set();\n  for (const raw of matches) {\n    const email = String(raw).trim().toLowerCase();\n    if (!email || seen.has(email)) continue;\n    seen.add(email);\n    if (email === cleanedSenderEmail) continue;\n    if (isInternalEmail(email)) continue;\n    if (isSystemSender(email)) continue;\n    return email;\n  }\n  return '';\n}\n\nconst results = [];\nfor (const item of $input.all()) {\n  const d = item.json;\n  const raw = (d.senderEmail || '').toString().trim();\n  const matchAngle = raw.match(/<([^>]+)>/);\n  const matchPlain = raw.match(/[A-Z0-9._%+\\-]+@[A-Z0-9.\\-]+\\.[A-Z]{2,}/i);\n  const cleanedSenderEmail = (matchAngle ? matchAngle[1] : matchPlain ? matchPlain[0] : raw).trim().toLowerCase();\n\n  if (isInternalEmail(cleanedSenderEmail)) continue;\n\n  const emailBodyRaw = String(d.emailBodyRaw || d.emailBody || d.bodyPreview || '').trim();\n  const emailBody = String(d.emailBody || d.bodyPreview || '').trim();\n  const subject = String(d.subject || '');\n  const bodyPreview = String(d.bodyPreview || '');\n\n  let leadMatchEmail = cleanedSenderEmail;\n  let extractedProspectEmail = '';\n  let matchedViaExtractedEmail = false;\n\n  if (isSystemSender(cleanedSenderEmail)) {\n    extractedProspectEmail = extractProspectEmail(subject, emailBody, bodyPreview, cleanedSenderEmail);\n    if (extractedProspectEmail) {\n      leadMatchEmail = extractedProspectEmail;\n      matchedViaExtractedEmail = true;\n    }\n  }\n\n  results.push({ json: {\n    inboxSource: String(d.inboxSource || ''),\n    senderEmail: String(d.senderEmail || ''),\n    senderName: String(d.senderName || ''),\n    subject,\n    bodyPreview,\n    emailBodyRaw,\n    emailBody,\n    receivedDateTime: String(d.receivedDateTime || ''),\n    internetMessageId: String(d.internetMessageId || ''),\n    messageId: String(d.messageId || ''),\n    toRecipients: String(d.toRecipients || ''),\n    ccRecipients: String(d.ccRecipients || ''),\n    cleanedSenderEmail,\n    leadMatchEmail,\n    extractedProspectEmail,\n    matchedViaExtractedEmail,\n    isSystemSender: isSystemSender(cleanedSenderEmail)\n  }});\n}\n\nreturn results.length > 0 ? results : [];"
+      },
+      "id": "SAMPLE_NODE_ID_025",
+      "name": "Clean and Normalize Sender Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1712,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Dedupe only flags duplicate reply TASK creation — does not block Lead/EST pause.\n// Match on internetMessageId in existing task Description.\nconst ctx = $('Normalize Lead Match Result').item.json;\nconst EXAMPLE_USER_ID = 'SAMPLE_RECORD_ID';\n\nconst senderEmail = String(ctx.cleanedSenderEmail || '').toLowerCase().trim();\nconst leadEmail = String(ctx.matchedLeadEmail || ctx.leadEmail || '').toLowerCase().trim();\nconst internetMessageId = String(ctx.internetMessageId || '').trim();\n\nlet replyTaskAlreadyExists = false;\nlet existingTaskId = null;\n\nif (internetMessageId) {\n  try {\n    const taskItems = $('Check Existing Reply Task').all();\n    for (const item of taskItems) {\n      const task = item && item.json;\n      if (!task || !task.Id) continue;\n      const description = String(task.Description || '');\n      if (description.includes(internetMessageId)) {\n        replyTaskAlreadyExists = true;\n        existingTaskId = String(task.Id);\n        break;\n      }\n    }\n  } catch (e) {\n    replyTaskAlreadyExists = false;\n  }\n}\n\nconst taskOwnerId = ctx.leadFound\n  ? String(ctx.taskOwnerId || ctx.matchedLeadOwnerId || ctx.leadOwnerId || '')\n  : String(ctx.taskOwnerId || EXAMPLE_USER_ID);\n\nreturn [{ json: {\n  alreadyProcessed: replyTaskAlreadyExists,\n  replyTaskAlreadyExists,\n  existingTaskId,\n  skipReason: replyTaskAlreadyExists\n    ? 'Reply task already created for this Message ID: ' + internetMessageId\n    : '',\n  emailMismatch: senderEmail !== leadEmail || !senderEmail,\n  senderEmail, leadEmail,\n  leadFound: ctx.leadFound === true,\n  ownerIdBlank: ctx.ownerIdBlank === true,\n  matchedLeadId: ctx.matchedLeadId ?? ctx.leadId ?? null,\n  matchedLeadName: String(ctx.matchedLeadName || ctx.leadName || ''),\n  matchedLeadEmail: String(ctx.matchedLeadEmail || ctx.leadEmail || ''),\n  matchedLeadOwnerId: String(ctx.matchedLeadOwnerId || ctx.leadOwnerId || ''),\n  matchedLeadOwnerName: String(ctx.matchedLeadOwnerName || ctx.leadOwnerName || ''),\n  matchedLeadOwnerEmail: String(ctx.matchedLeadOwnerEmail || ctx.leadOwnerEmail || ''),\n  taskOwnerId,\n  leadId: String(ctx.leadId || ctx.matchedLeadId || ''),\n  leadName: String(ctx.leadName || ctx.matchedLeadName || ''),\n  leadStatus: String(ctx.leadStatus || ''),\n  engagementStatus: String(ctx.engagementStatus || ''),\n  leadEmail: String(ctx.leadEmail || ctx.matchedLeadEmail || ''),\n  leadOwnerId: String(ctx.leadOwnerId || ctx.matchedLeadOwnerId || ''),\n  leadOwnerName: String(ctx.leadOwnerName || ctx.matchedLeadOwnerName || ''),\n  leadOwnerEmail: String(ctx.leadOwnerEmail || ctx.matchedLeadOwnerEmail || ''),\n  cleanedSenderEmail: String(ctx.cleanedSenderEmail || ''),\n  leadMatchEmail: String(ctx.leadMatchEmail || ctx.cleanedSenderEmail || ''),\n  extractedProspectEmail: String(ctx.extractedProspectEmail || ''),\n  matchedViaExtractedEmail: ctx.matchedViaExtractedEmail === true,\n  isSystemSender: ctx.isSystemSender === true,\n  senderName: String(ctx.senderName || ''),\n  subject: String(ctx.subject || ''),\n  bodyPreview: String(ctx.bodyPreview || ''),\n  emailBodyRaw: String(ctx.emailBodyRaw || ctx.emailBody || ctx.bodyPreview || ''),\n  emailBody: String(ctx.emailBody || ctx.bodyPreview || ''),\n  receivedDateTime: String(ctx.receivedDateTime || ''),\n  internetMessageId,\n  messageId: String(ctx.messageId || ''),\n  inboxSource: String(ctx.inboxSource || ''),\n  toRecipients: String(ctx.toRecipients || ''),\n  ccRecipients: String(ctx.ccRecipients || '')\n}}];"
+      },
+      "id": "SAMPLE_NODE_ID_026",
+      "name": "Normalize Dedupe Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5872,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "status": "Completed",
+        "additionalFields": {
+          "activityDate": "={{ $now.setZone('America/Los_Angeles').toFormat('yyyy-MM-dd') }}",
+          "description": "={{ (() => { const d = $('Normalize Lead Match Result').item.json; const bodyText = String(d.emailBody || '').trim() || String(d.bodyPreview || ''); return ['AWARENESS ACTIVITY LOG','','Classification: Calendar Invite Response','Automation was NOT paused.','Engagement Status was NOT changed.','Human Override was NOT used.','No human-response reply task was created. This completed awareness activity was logged only.','','Lead Owner: ' + (d.leadOwnerName || 'unknown'),'Lead Owner Email: ' + (d.leadOwnerEmail || 'unknown'),'Lead Owner ID: ' + (d.leadOwnerId || 'unknown'),'','Inbox: ' + (d.inboxSource || ''),'From: ' + (d.senderName || '') + ' <' + (d.senderEmail || '') + '>','To: ' + (d.toRecipients || ''),'CC: ' + (d.ccRecipients || 'none'),'Subject: ' + (d.subject || ''),'Received: ' + (d.receivedDateTime || ''),'Internet Message ID: ' + (d.internetMessageId || ''),'','Email Body:', bodyText].join('\\n'); })() }}",
+          "owner": "={{ $('Normalize Lead Match Result').item.json.taskOwnerId }}",
+          "priority": "Normal",
+          "subject": "={{ 'Calendar response: ' + $('Normalize Lead Match Result').item.json.subject }}",
+          "whoId": "={{ $('Normalize Lead Match Result').item.json.leadId }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_027",
+      "name": "Log Calendar Response as Completed Activity",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        3952,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "upsert",
+        "customObject": "Engagement_Status_Tracker__c",
+        "externalId": "Sequence_Key__c",
+        "externalIdValue": "={{ $('Normalize Lead Match Result').item.json.leadId + '_Active_v2' }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Sequence_Key__c",
+              "value": "={{ $('Normalize Lead Match Result').item.json.leadId + '_Active_v2' }}"
+            },
+            {
+              "fieldId": "Related_Lead__c",
+              "value": "={{ $('Normalize Lead Match Result').item.json.leadId }}"
+            },
+            {
+              "fieldId": "Sequence_Status__c",
+              "value": "Paused"
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_028",
+      "name": "Pause Active EST on Reply",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        5232,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ \"SELECT Id, Subject, Description, OwnerId, Owner.Name, WhoId, ActivityDate, CreatedDate FROM Task WHERE WhoId = '\" + $(\"Normalize Lead Match Result\").item.json.leadId + \"' AND Subject = 'Prospect replied \\u2014 respond within 24 hours' AND ActivityDate = \" + $now.setZone('America/Los_Angeles').toFormat('yyyy-MM-dd') + \" ORDER BY CreatedDate DESC LIMIT 50\" }}"
+      },
+      "id": "SAMPLE_NODE_ID_029",
+      "name": "Check Existing Reply Task",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        5552,
+        864
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "owner-valid-check",
+              "leftValue": "={{ $('Prepare Reply Task Payload').item.json.taskOwnerId }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_030",
+      "name": "Reply Task Owner Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        6832,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\nconst normalizedText = (\n  String(item.subject || '') + ' ' +\n  String(item.emailBody || item.bodyPreview || '') + ' ' +\n  String(item.senderName || '') + ' ' +\n  String(item.senderEmail || '')\n).toLowerCase();\n\nconst matchesAny = (patterns) => patterns.some((p) => normalizedText.includes(p));\n\nconst BOUNCE_PATTERNS = [\n  'undeliverable', 'delivery has failed', 'delivery failure',\n  'delivery status notification', 'mail delivery subsystem', 'returned mail',\n  'failure notice', 'message blocked', 'address not found',\n  'recipient address rejected', 'mailbox unavailable',\n  \"couldn't be delivered\", 'could not be delivered', 'permanent failure',\n  '550', '5.1.1', '5.4.1', 'postmaster', 'daemon'\n];\n\nconst OOO_PATTERNS = [\n  'out of office', 'automatic reply', 'auto-reply', 'auto reply', 'ooo',\n  'away from the office', 'vacation', 'currently unavailable', 'autoresponder'\n];\n\nconst CALENDAR_PATTERNS = [\n  'accepted:', 'declined:', 'tentative:', 'meeting accepted', 'meeting declined',\n  'calendar', 'invitation', 'updated invitation'\n];\n\nlet replyClassification = 'human';\n\nif (matchesAny(BOUNCE_PATTERNS)) {\n  replyClassification = 'bounce';\n} else if (matchesAny(OOO_PATTERNS)) {\n  replyClassification = 'ooo';\n} else if (matchesAny(CALENDAR_PATTERNS)) {\n  replyClassification = 'calendar';\n}\n\nreturn [{ json: { ...item, replyClassification, normalizedText } }];"
+      },
+      "id": "SAMPLE_NODE_ID_031",
+      "name": "Classify Reply Type Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3312,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "status": "Completed",
+        "additionalFields": {
+          "activityDate": "={{ $now.setZone('America/Los_Angeles').toFormat('yyyy-MM-dd') }}",
+          "description": "={{ (() => { const d = $('Normalize Lead Match Result').item.json; const bodyText = String(d.emailBody || '').trim() || String(d.bodyPreview || ''); return ['AWARENESS ACTIVITY LOG','','Classification: Bounce / Delivery Failure','Automation was NOT paused.','Engagement Status was NOT changed.','Human Override was NOT used.','No human-response reply task was created. This completed awareness activity was logged only.','','Lead Owner: ' + (d.leadOwnerName || 'unknown'),'Lead Owner Email: ' + (d.leadOwnerEmail || 'unknown'),'Lead Owner ID: ' + (d.leadOwnerId || 'unknown'),'','Inbox: ' + (d.inboxSource || ''),'From: ' + (d.senderName || '') + ' <' + (d.senderEmail || '') + '>','To: ' + (d.toRecipients || ''),'CC: ' + (d.ccRecipients || 'none'),'Subject: ' + (d.subject || ''),'Received: ' + (d.receivedDateTime || ''),'Internet Message ID: ' + (d.internetMessageId || ''),'','Email Body:', bodyText].join('\\n'); })() }}",
+          "owner": "={{ $('Normalize Lead Match Result').item.json.taskOwnerId }}",
+          "priority": "Normal",
+          "subject": "Email Bounce / Delivery Failure Received",
+          "whoId": "={{ $('Normalize Lead Match Result').item.json.leadId }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_032",
+      "name": "Log Bounce / Delivery Failure as Completed Activity",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        3952,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ \"SELECT Id, Name, Engagement_Status__c, OwnerId, Owner.Name, Owner.Email FROM Lead WHERE Id = '\" + $('Normalize Lead Match Result').item.json.leadId + \"' LIMIT 1\" }}"
+      },
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        4592,
+        864
+      ],
+      "id": "SAMPLE_NODE_ID_033",
+      "name": "Verify Lead Engagement Status Pause"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Verify Lead Engagement Status Pause').item.json.Engagement_Status__c }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "Paused - Human Conversation"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4912,
+        864
+      ],
+      "id": "SAMPLE_NODE_ID_034",
+      "name": "Lead Pause Verified?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const dedupe = $('Normalize Dedupe Result').item.json;\nconst taskOwnerId = String(dedupe.taskOwnerId || dedupe.matchedLeadOwnerId || dedupe.leadOwnerId || '');\nconst expectedTaskOwnerName = String(dedupe.matchedLeadOwnerName || dedupe.leadOwnerName || '');\nconst leadOwnerId = String(dedupe.leadOwnerId || dedupe.matchedLeadOwnerId || '');\nconst leadOwnerName = String(dedupe.leadOwnerName || dedupe.matchedLeadOwnerName || '');\nconst leadId = String(dedupe.leadId || dedupe.matchedLeadId || '');\nconst leadName = String(dedupe.leadName || dedupe.matchedLeadName || '');\nconst subject = 'Prospect replied — respond within 24 hours';\nconst bodyText = String(dedupe.emailBody || '').trim() || String(dedupe.bodyPreview || '').trim();\nconst description = [\n  'Prospect replied via email.',\n  '',\n  'AUTOMATION ACTION:',\n  'Lead replied: Paused - human conversation',\n  'This was classified as a real human reply.',\n  'Lead Engagement Status was changed to: Paused - Human Conversation.',\n  '',\n  'Inbox Source: ' + (dedupe.inboxSource || 'unknown'),\n  '',\n  'To: ' + (dedupe.toRecipients || ''),\n  'CC: ' + (dedupe.ccRecipients || 'none'),\n  '',\n  'From: ' + (dedupe.senderName || '') + ' <' + (dedupe.senderEmail || '') + '>',\n  'Subject: ' + (dedupe.subject || ''),\n  'Received: ' + (dedupe.receivedDateTime || ''),\n  'Internet Message ID: ' + (dedupe.internetMessageId || ''),\n  '',\n  'Email Body:',\n  bodyText\n].join('\\n');\n\nreturn [{ json: {\n  taskOwnerId,\n  expectedTaskOwnerName,\n  leadOwnerId,\n  leadOwnerName,\n  leadId,\n  leadName,\n  subject,\n  description\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6512,
+        864
+      ],
+      "id": "SAMPLE_NODE_ID_035",
+      "name": "Prepare Reply Task Payload"
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ \"SELECT Id, Subject, OwnerId, Owner.Name, WhoId, Who.Name FROM Task WHERE Id = '\" + ($('Create Reply Task for Lead Owner').item.json.id || $('Create Reply Task for Lead Owner').item.json.Id || '') + \"' LIMIT 1\" }}"
+      },
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        7472,
+        864
+      ],
+      "id": "SAMPLE_NODE_ID_036",
+      "name": "Verify Reply Task Owner"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Verify Reply Task Owner').item.json.OwnerId }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "={{ $('Prepare Reply Task Payload').item.json.taskOwnerId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        7792,
+        864
+      ],
+      "id": "SAMPLE_NODE_ID_037",
+      "name": "Reply Task Owner Correct?"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $json.messageId }}",
+        "output": "raw",
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_038",
+      "name": "Get Example User's Full Email Message",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        752,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const normalized = $(\"Normalize Example User's Email\").item.json;\nconst msg = $input.first().json || {};\nconst emailBodyRaw = String(\n  msg.body?.content || msg.body || normalized.emailBody || normalized.bodyPreview || ''\n).trim();\nfunction htmlToPlainText(html) {\n  let text = String(html || '');\n  if (!text) return '';\n  text = text\n    .replace(/<head[\\s\\S]*?<\\/head>/gi, '')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<!--[\\s\\S]*?-->/g, '');\n  text = text\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|blockquote|li|tr|h[1-6])>/gi, '\\n')\n    .replace(/<[^>]+>/g, '');\n  text = text\n    .replace(/&nbsp;/gi, ' ')\n    .replace(/&amp;/gi, '&')\n    .replace(/&lt;/gi, '<')\n    .replace(/&gt;/gi, '>')\n    .replace(/&quot;/gi, '\"')\n    .replace(/&#39;/gi, \"'\")\n    .replace(/&#(\\d+);/g, (_, n) => String.fromCharCode(Number(n)));\n  return text.replace(/\\r\\n/g, '\\n').replace(/\\n{3,}/g, '\\n\\n').trim();\n}\nconst emailBody = htmlToPlainText(emailBodyRaw) || String(normalized.bodyPreview || '').trim();\nreturn [{ json: { ...normalized, emailBodyRaw, emailBody } }];"
+      },
+      "id": "SAMPLE_NODE_ID_039",
+      "name": "Enrich Example User Email With Full Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $json.messageId }}",
+        "output": "raw",
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_040",
+      "name": "Get Example Representative's Full Email Message",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        752,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const normalized = $(\"Normalize Example Representative's Email\").item.json;\nconst msg = $input.first().json || {};\nconst emailBodyRaw = String(\n  msg.body?.content || msg.body || normalized.emailBody || normalized.bodyPreview || ''\n).trim();\nfunction htmlToPlainText(html) {\n  let text = String(html || '');\n  if (!text) return '';\n  text = text\n    .replace(/<head[\\s\\S]*?<\\/head>/gi, '')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<!--[\\s\\S]*?-->/g, '');\n  text = text\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|blockquote|li|tr|h[1-6])>/gi, '\\n')\n    .replace(/<[^>]+>/g, '');\n  text = text\n    .replace(/&nbsp;/gi, ' ')\n    .replace(/&amp;/gi, '&')\n    .replace(/&lt;/gi, '<')\n    .replace(/&gt;/gi, '>')\n    .replace(/&quot;/gi, '\"')\n    .replace(/&#39;/gi, \"'\")\n    .replace(/&#(\\d+);/g, (_, n) => String.fromCharCode(Number(n)));\n  return text.replace(/\\r\\n/g, '\\n').replace(/\\n{3,}/g, '\\n\\n').trim();\n}\nconst emailBody = htmlToPlainText(emailBodyRaw) || String(normalized.bodyPreview || '').trim();\nreturn [{ json: { ...normalized, emailBodyRaw, emailBody } }];"
+      },
+      "id": "SAMPLE_NODE_ID_041",
+      "name": "Enrich Example Representative Email With Full Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cutoff = new Date('2025-06-15T00:00:00Z');\nconst results = [];\n\nfor (const item of $input.all()) {\n  const received = new Date(item.json.receivedDateTime || '');\n  if (Number.isNaN(received.getTime())) continue;\n  if (received < cutoff) continue;\n  results.push(item);\n}\n\nreturn results;"
+      },
+      "id": "SAMPLE_NODE_ID_042",
+      "name": "Skip Emails Before June 29 2026",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2032,
+        544
+      ]
+    }
+  ],
+  "connections": {
+    "Watch Example User's Inbox": {
+      "main": [
+        [
+          {
+            "node": "Normalize Example User's Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Example User's Email": {
+      "main": [
+        [
+          {
+            "node": "Get Example User's Full Email Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Watch Example Representative's Inbox": {
+      "main": [
+        [
+          {
+            "node": "Normalize Example Representative's Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Example Representative's Email": {
+      "main": [
+        [
+          {
+            "node": "Get Example Representative's Full Email Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Both Inboxes": {
+      "main": [
+        [
+          {
+            "node": "Clean and Normalize Sender Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean and Normalize Sender Email": {
+      "main": [
+        [
+          {
+            "node": "Skip Emails Before June 29 2026",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match Sender Email to Salesforce Lead": {
+      "main": [
+        [
+          {
+            "node": "Normalize Lead Match Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Lead Match Result": {
+      "main": [
+        [
+          {
+            "node": "Lead Match Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Match Found?": {
+      "main": [
+        [
+          {
+            "node": "Classify Reply Type Code",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip — Lead Has No Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sender Match Email Valid?": {
+      "main": [
+        [
+          {
+            "node": "Match Sender Email to Salesforce Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip — Lead Has No Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Reply Type Code": {
+      "main": [
+        [
+          {
+            "node": "Route Reply Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Reply Type": {
+      "main": [
+        [
+          {
+            "node": "Log Bounce / Delivery Failure as Completed Activity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log OOO / Auto Reply as Completed Activity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Calendar Response as Completed Activity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Lead Stage Before Pause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Lead Stage Before Pause": {
+      "main": [
+        [
+          {
+            "node": "Update Lead — Pause Active Automation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Inbound Reply — Lead Stage Blocked, No Automation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead — Pause Active Automation": {
+      "main": [
+        [
+          {
+            "node": "Verify Lead Engagement Status Pause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Lead Engagement Status Pause": {
+      "main": [
+        [
+          {
+            "node": "Lead Pause Verified?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Pause Verified?": {
+      "main": [
+        [
+          {
+            "node": "Pause Active EST on Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause Active EST on Reply": {
+      "main": [
+        [
+          {
+            "node": "Check Existing Reply Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply Already Processed?": {
+      "main": [
+        [
+          {
+            "node": "Reply Task Already Existed — Lead and EST Paused",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Reply Task Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Reply Task Payload": {
+      "main": [
+        [
+          {
+            "node": "Reply Task Owner Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply Task Owner Valid?": {
+      "main": [
+        [
+          {
+            "node": "Create Reply Task for Lead Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Reply Task for Lead Owner": {
+      "main": [
+        [
+          {
+            "node": "Verify Reply Task Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Reply Task Owner": {
+      "main": [
+        [
+          {
+            "node": "Reply Task Owner Correct?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Example User's Full Email Message": {
+      "main": [
+        [
+          {
+            "node": "Enrich Example User Email With Full Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich Example User Email With Full Body": {
+      "main": [
+        [
+          {
+            "node": "Merge Both Inboxes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Example Representative's Full Email Message": {
+      "main": [
+        [
+          {
+            "node": "Enrich Example Representative Email With Full Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich Example Representative Email With Full Body": {
+      "main": [
+        [
+          {
+            "node": "Merge Both Inboxes",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Check Existing Reply Task": {
+      "main": [
+        [
+          {
+            "node": "Normalize Dedupe Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Dedupe Result": {
+      "main": [
+        [
+          {
+            "node": "Reply Already Processed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Emails Before June 29 2026": {
+      "main": [
+        [
+          {
+            "node": "Sender Match Email Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "nodeGroups": [],
+  "tags": []
+}

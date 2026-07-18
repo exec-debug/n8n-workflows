@@ -1,0 +1,565 @@
+{
+  "name": "Meeting Status Sync and RSVP Guard",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "SAMPLE_NODE_ID_001",
+      "name": "Poll Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1344,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "tm",
+              "name": "testMode",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "tr",
+              "name": "testRecordId",
+              "type": "string",
+              "value": "SAMPLE_RECORD_ID"
+            },
+            {
+              "id": "be",
+              "name": "batchLimit",
+              "type": "number",
+              "value": 50
+            },
+            {
+              "id": "de",
+              "name": "senderEmail",
+              "type": "string",
+              "value": "user@example.com"
+            },
+            {
+              "id": "le",
+              "name": "colleagueEmail",
+              "type": "string",
+              "value": "colleague@example.com"
+            },
+            {
+              "id": "tol",
+              "name": "timeDiffToleranceSec",
+              "type": "number",
+              "value": 60
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_002",
+      "name": "Meeting Status Sync Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1120,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "query": "={{ $('Meeting Status Sync Config').item.json.testMode === true\n  ? \"SELECT Id, Lead_Email__c, Related_Lead__c, Meeting_Start_Date_Time__c, Meeting_End_Date_Time__c, Meeting_Timezone__c, Reminder_24h_Scheduled_Time__c, Reminder_1h_Scheduled_Time__c, X24_Hour_Reminder_Sent__c, X1_Hour_Reminder_Sent__c, Outlook_Event_ID__c, Meeting_Key__c, Review_Notes__c FROM Meeting_Reminder_Tracker__c WHERE Id = '\" + $('Meeting Status Sync Config').item.json.testRecordId + \"' LIMIT 1\"\n  : \"SELECT Id, Lead_Email__c, Related_Lead__c, Meeting_Start_Date_Time__c, Meeting_End_Date_Time__c, Meeting_Timezone__c, Reminder_24h_Scheduled_Time__c, Reminder_1h_Scheduled_Time__c, X24_Hour_Reminder_Sent__c, X1_Hour_Reminder_Sent__c, Outlook_Event_ID__c, Meeting_Key__c, Review_Notes__c FROM Meeting_Reminder_Tracker__c WHERE Meeting_Status__c = 'Scheduled' AND Meeting_Start_Date_Time__c >= \" + $now.toISO() + \" AND Lead_Email__c != null AND Related_Lead__c != null AND Outlook_Event_ID__c != null AND (X24_Hour_Reminder_Sent__c = false OR X1_Hour_Reminder_Sent__c = false) LIMIT \" + $('Meeting Status Sync Config').item.json.batchLimit }}"
+      },
+      "id": "SAMPLE_NODE_ID_003",
+      "name": "Query Scheduled Trackers",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        -896,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "limit": 5,
+        "output": "fields",
+        "fields": [
+          "attendees",
+          "iCalUId",
+          "isCancelled",
+          "start",
+          "end",
+          "subject",
+          "organizer"
+        ],
+        "filters": {
+          "custom": "={{ \"iCalUId eq '\" + $('Query Scheduled Trackers').item.json.Outlook_Event_ID__c + \"'\" }}"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_004",
+      "name": "Fetch Outlook Event (W12A)",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        288
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// W12A: Process Outlook Status\n// Classifies each tracker: cancelled | timechange | lastsynced\n// Does NOT send emails. Does NOT touch reminder sent flags. Does NOT delete SF records.\n// Only cancelled/missing Outlook events block reminders (Meeting_Status__c = Cancelled).\n// RSVP status (declined/tentative/none/not found) does NOT block reminders — lastsynced only.\n// Review_Notes__c only written on meaningful issues, not on clean accepted syncs.\n\nconst INTERNAL_EMAILS = ['user@example.com', 'colleague@example.com'];\nconst TIME_TOLERANCE_SEC = $('Meeting Status Sync Config').item.json.timeDiffToleranceSec || 60;\n\nconst trackerItems = $('Query Scheduled Trackers').all();\nconst outlookItems = $input.all();\n\nfunction buildNote(existing, message) {\n  const now = new Date();\n  const pad = n => String(n).padStart(2, '0');\n  const ts = now.getUTCFullYear() + '-' + pad(now.getUTCMonth()+1) + '-' + pad(now.getUTCDate())\n    + ' ' + pad(now.getUTCHours()) + ':' + pad(now.getUTCMinutes()) + ' UTC';\n  const tag = '[W12A ' + ts + '] ' + message;\n  if (!existing || existing.trim() === '') return tag;\n  return tag + '\\n' + existing.trim();\n}\n\nfunction checkTimeChange(sfStartISO, sfEndISO, liveEvent) {\n  let timeChanged = false;\n  let newStartISO = '', newEndISO = '', new24hISO = '', new1hISO = '';\n  if (sfStartISO && liveEvent.start?.dateTime) {\n    const sfMs = new Date(sfStartISO).getTime();\n    const outlookMs = new Date(liveEvent.start.dateTime).getTime();\n    if (Math.abs(sfMs - outlookMs) / 1000 > TIME_TOLERANCE_SEC) {\n      timeChanged = true;\n      newStartISO = new Date(liveEvent.start.dateTime).toISOString();\n      newEndISO = liveEvent.end?.dateTime ? new Date(liveEvent.end.dateTime).toISOString() : sfEndISO;\n      new24hISO = new Date(new Date(liveEvent.start.dateTime).getTime() - 24 * 60 * 60 * 1000).toISOString();\n      new1hISO = new Date(new Date(liveEvent.start.dateTime).getTime() - 1 * 60 * 60 * 1000).toISOString();\n    }\n  }\n  return { timeChanged, newStartISO, newEndISO, new24hISO, new1hISO };\n}\n\nconst results = [];\n\nfor (let i = 0; i < trackerItems.length; i++) {\n  const tracker = trackerItems[i].json;\n  const trackerId = String(tracker.Id || '');\n  const iCalUID = String(tracker.Outlook_Event_ID__c || '').trim();\n  const leadEmail = String(tracker.Lead_Email__c || '').trim().toLowerCase();\n  const sfStartISO = String(tracker.Meeting_Start_Date_Time__c || '');\n  const sfEndISO = String(tracker.Meeting_End_Date_Time__c || '');\n  const existingNote = String(tracker.Review_Notes__c || '');\n\n  if (!trackerId || !iCalUID || !leadEmail) continue;\n\n  const matchingEvents = outlookItems.filter(item =>\n    String(item.json.iCalUId || '').trim() === iCalUID\n  );\n\n  if (matchingEvents.length === 0) {\n    results.push({ json: { trackerId, outcome: 'cancelled',\n      newNote: buildNote(existingNote, 'Outlook event missing or deleted. Status set to Cancelled.'),\n      iCalUID, leadEmail }});\n    continue;\n  }\n\n  if (matchingEvents.length > 1) {\n    results.push({ json: { trackerId, outcome: 'lastsynced', writeNote: true,\n      newNote: buildNote(existingNote, matchingEvents.length + ' Outlook events matched iCalUID — ambiguous. Manual review needed.'),\n      iCalUID, leadEmail }});\n    continue;\n  }\n\n  const liveEvent = matchingEvents[0].json;\n\n  if (liveEvent.isCancelled === true) {\n    results.push({ json: { trackerId, outcome: 'cancelled',\n      newNote: buildNote(existingNote, 'Outlook event is cancelled (isCancelled=true). Status set to Cancelled.'),\n      iCalUID, leadEmail }});\n    continue;\n  }\n\n  // Time change check — runs regardless of RSVP status\n  const { timeChanged, newStartISO, newEndISO, new24hISO, new1hISO } = checkTimeChange(sfStartISO, sfEndISO, liveEvent);\n\n  if (timeChanged) {\n    results.push({ json: { trackerId, outcome: 'timechange',\n      newStartISO, newEndISO, new24hISO, new1hISO,\n      newNote: buildNote(existingNote, 'Meeting time changed in Outlook. SF start was ' + sfStartISO + ', Outlook start is ' + newStartISO + '. Tracker time and reminder times synced. Status kept Scheduled.'),\n      iCalUID, leadEmail }});\n    continue;\n  }\n\n  const attendees = Array.isArray(liveEvent.attendees) ? liveEvent.attendees : [];\n  const leadAttendee = attendees.find(a => {\n    const addr = String(a.emailAddress?.address || '').trim().toLowerCase();\n    return addr === leadEmail && !INTERNAL_EMAILS.includes(addr);\n  });\n\n  if (!leadAttendee) {\n    results.push({ json: { trackerId, outcome: 'lastsynced', writeNote: true,\n      newNote: buildNote(existingNote, 'Lead not found in Outlook attendee list; reminders allowed per current policy.'),\n      iCalUID, leadEmail }});\n    continue;\n  }\n\n  const rsvp = String(leadAttendee.status?.response || '').trim().toLowerCase();\n\n  if (rsvp === 'declined') {\n    results.push({ json: { trackerId, outcome: 'lastsynced', writeNote: true,\n      newNote: buildNote(existingNote, 'Lead RSVP is declined; reminders allowed per current policy.'),\n      iCalUID, leadEmail }});\n    continue;\n  }\n\n  if (rsvp !== 'accepted') {\n    results.push({ json: { trackerId, outcome: 'lastsynced', writeNote: true,\n      newNote: buildNote(existingNote, 'Lead RSVP is not accepted yet; reminders allowed per current policy.'),\n      iCalUID, leadEmail }});\n    continue;\n  }\n\n  // Clean: accepted, active, times match — Last_Synced__c only, do not touch Review_Notes__c\n  results.push({ json: { trackerId, outcome: 'lastsynced', writeNote: false, iCalUID, leadEmail }});\n}\n\nreturn results.length > 0 ? results : [];"
+      },
+      "id": "SAMPLE_NODE_ID_005",
+      "name": "Process Outlook Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.outcome }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "cancelled"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.outcome }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "timechange"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "lastsynced"
+        }
+      },
+      "id": "SAMPLE_NODE_ID_006",
+      "name": "Route by Outcome",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -224,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "update",
+        "customObject": "Meeting_Reminder_Tracker__c",
+        "recordId": "={{ $json.trackerId }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Meeting_Status__c",
+              "value": "Cancelled"
+            },
+            {
+              "fieldId": "Last_Synced__c",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "fieldId": "Review_Notes__c",
+              "value": "={{ $json.newNote }}"
+            }
+          ]
+        },
+        "updateFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_007",
+      "name": "Update Tracker — Set Cancelled",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "update",
+        "customObject": "Meeting_Reminder_Tracker__c",
+        "recordId": "={{ $json.trackerId }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Meeting_Status__c",
+              "value": "Declined"
+            },
+            {
+              "fieldId": "Last_Synced__c",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "fieldId": "Review_Notes__c",
+              "value": "={{ $json.newNote }}"
+            }
+          ]
+        },
+        "updateFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_008",
+      "name": "Update Tracker — Set Declined",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "update",
+        "customObject": "Meeting_Reminder_Tracker__c",
+        "recordId": "={{ $json.trackerId }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Meeting_Start_Date_Time__c",
+              "value": "={{ $json.newStartISO }}"
+            },
+            {
+              "fieldId": "Meeting_End_Date_Time__c",
+              "value": "={{ $json.newEndISO }}"
+            },
+            {
+              "fieldId": "Reminder_24h_Scheduled_Time__c",
+              "value": "={{ $json.new24hISO }}"
+            },
+            {
+              "fieldId": "Reminder_1h_Scheduled_Time__c",
+              "value": "={{ $json.new1hISO }}"
+            },
+            {
+              "fieldId": "Last_Synced__c",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "fieldId": "Review_Notes__c",
+              "value": "={{ $json.newNote }}"
+            }
+          ]
+        },
+        "updateFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_009",
+      "name": "Update Tracker — Sync New Time",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nfor (const item of $input.all()) {\n  const d = item.json;\n  if (d.writeNote === true) {\n    results.push({ json: { trackerId: d.trackerId, newNote: d.newNote, writeNote: true } });\n  } else {\n    results.push({ json: { trackerId: d.trackerId, writeNote: false } });\n  }\n}\nreturn results;"
+      },
+      "id": "SAMPLE_NODE_ID_010",
+      "name": "Last Synced Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.writeNote }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "SAMPLE_NODE_ID_011",
+      "name": "Write Note?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        224,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "update",
+        "customObject": "Meeting_Reminder_Tracker__c",
+        "recordId": "={{ $json.trackerId }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Last_Synced__c",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "fieldId": "Review_Notes__c",
+              "value": "={{ $json.newNote }}"
+            }
+          ]
+        },
+        "updateFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_012",
+      "name": "Update Tracker — Last Synced + Note",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "customObject",
+        "operation": "update",
+        "customObject": "Meeting_Reminder_Tracker__c",
+        "recordId": "={{ $json.trackerId }}",
+        "customFieldsUi": {
+          "customFieldsValues": [
+            {
+              "fieldId": "Last_Synced__c",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "updateFields": {}
+      },
+      "id": "SAMPLE_NODE_ID_013",
+      "name": "Update Tracker — Last Synced Only",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        672
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "SAMPLE_NODE_ID_014",
+      "name": "Manual Admin Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1344,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## W12A: Meeting Status Sync / Outlook RSVP Guard\n\n✅ [STATUS REDACTED — configure after import]\n\nPurpose: Syncs live Outlook calendar status to Salesforce Meeting_Reminder_Tracker__c.\nDoes NOT send emails. Does NOT mark reminder sent flags.\nDoes NOT delete Salesforce records.\n\nSchedule: every 30 min\ntestMode: false (production)\nbatchLimit: 50\nCredential: Microsoft Outlook account (Example User only)\nLookup: iCalUId eq Outlook_Event_ID__c (Method A)\n\nOutcomes:\n  cancelled  → Meeting_Status__c = Cancelled + Last_Synced__c + Review_Notes__c (ONLY case that blocks reminders)\n  timechange → sync start/end/reminder times  + Last_Synced__c + Review_Notes__c\n  lastsynced (RSVP issue) → Last_Synced__c + neutral Review_Notes__c — reminders still allowed\n  lastsynced (clean) → Last_Synced__c ONLY — Review_Notes__c untouched\n\nRSVP declined/tentative/none/not-found does NOT set Declined or block reminders.\n\nFields NEVER written: X24_Hour_Reminder_Sent__c, X1_Hour_Reminder_Sent__c,\nX24_Hour_Reminder_Task_Created__c, X1_Hour_Reminder_Task_Created__c\n\nZero-event guard: Fetch Outlook Event has alwaysOutputData=true\nso Process Outlook Status always runs even when Outlook returns 0 events.\nThis ensures deleted/missing events are correctly marked Cancelled.",
+        "height": 680,
+        "width": 2220,
+        "color": 4
+      },
+      "id": "SAMPLE_NODE_ID_015",
+      "name": "Sticky Note f2cc02b0",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1440,
+        1040
+      ]
+    }
+  ],
+  "connections": {
+    "Meeting Status Sync Config": {
+      "main": [
+        [
+          {
+            "node": "Query Scheduled Trackers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Scheduled Trackers": {
+      "main": [
+        [
+          {
+            "node": "Fetch Outlook Event (W12A)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Outlook Event (W12A)": {
+      "main": [
+        [
+          {
+            "node": "Process Outlook Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Outlook Status": {
+      "main": [
+        [
+          {
+            "node": "Route by Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Outcome": {
+      "main": [
+        [
+          {
+            "node": "Update Tracker — Set Cancelled",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Tracker — Sync New Time",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Last Synced Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Last Synced Gate": {
+      "main": [
+        [
+          {
+            "node": "Write Note?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Note?": {
+      "main": [
+        [
+          {
+            "node": "Update Tracker — Last Synced + Note",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Tracker — Last Synced Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Admin Run": {
+      "main": [
+        [
+          {
+            "node": "Meeting Status Sync Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Every 30 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Meeting Status Sync Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
